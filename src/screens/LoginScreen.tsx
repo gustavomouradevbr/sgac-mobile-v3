@@ -4,17 +4,17 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router'; // Router do Expo para navegação entre telas
 import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 export default function LoginScreen() {
@@ -32,7 +32,7 @@ export default function LoginScreen() {
   // Função chamada ao pressionar o botão Entrar
   // Atualmente apenas navega para a tela /dashboard
   const handleLogin = () => {
-    router.push('/dashboard');
+    router.push('/dashboard/adicionar');
   };
 
   return (
