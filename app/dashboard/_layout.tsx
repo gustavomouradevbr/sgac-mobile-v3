@@ -1,16 +1,16 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-  Modal,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+    Image,
+    Modal,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions,
 } from 'react-native';
 
 type NavItem = {
@@ -62,7 +62,7 @@ export default function DashboardLayout() {
                 <Image
                   source={require('../../assets/senac/senac-logo.png')}
                   style={styles.mobileLogo}
-                  contentFit="contain"
+                  resizeMode="contain"
                   accessibilityLabel="Logo do Senac"
                 />
               </View>
@@ -131,7 +131,7 @@ function Sidebar({ variant, pathname, onNavigate, onLogout }: SidebarProps) {
               <Image
                 source={require('../../assets/senac/senac-logo.png')}
                 style={styles.drawerLogo}
-                contentFit="contain"
+                resizeMode="contain"
                 accessibilityLabel="Logo do Senac"
               />
             </View>
@@ -148,7 +148,7 @@ function Sidebar({ variant, pathname, onNavigate, onLogout }: SidebarProps) {
             <Image
               source={require('../../assets/senac/senac-logo.png')}
               style={styles.desktopLogo}
-              contentFit="contain"
+              resizeMode="contain"
               accessibilityLabel="Logo do Senac"
             />
           </View>

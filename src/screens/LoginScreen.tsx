@@ -1,20 +1,18 @@
 // Hooks e APIs React/Expo usados na tela
-import { Image } from 'expo-image';
 // Não usar expo-linear-gradient para evitar dependência externa
 import { useRouter } from 'expo-router'; // Router do Expo para navegação entre telas
 import React, { useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 
 export default function LoginScreen() {
@@ -23,11 +21,6 @@ export default function LoginScreen() {
   // Estados locais para os campos do formulário
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
-  // Perfil selecionado e controle do modal de opções
-  const [profile, setProfile] = useState('Aluno');
-  const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const profiles = ['Aluno', 'Coordenador', 'Administrador'];
 
   // Função chamada ao pressionar o botão Entrar
   // Atualmente apenas navega para a tela /dashboard
@@ -50,7 +43,7 @@ export default function LoginScreen() {
                 <Image
                   source={require('../../assets/senac/senac-logo.png')}
                   style={styles.logo}
-                  contentFit="contain"
+                  resizeMode="contain"
                   accessibilityLabel="Logo do Senac"
                 />
               </View>
@@ -92,42 +85,6 @@ export default function LoginScreen() {
                     style={styles.input}
                     textContentType="password"
                   />
-                </View>
-
-                {/* Campo: Perfil de acesso (dropdown customizado) */}
-                <View style={styles.field}>
-                  <Text style={styles.label}>Perfil de acesso</Text>
-                  <Pressable style={styles.pickerButton} onPress={() => setProfileModalVisible(true)}>
-                    <Text style={styles.pickerText}>{profile}</Text>
-                  </Pressable>
-
-                  <Modal
-                    visible={profileModalVisible}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => setProfileModalVisible(false)}
-                  >
-                    <TouchableOpacity
-                      style={styles.modalOverlay}
-                      activeOpacity={1}
-                      onPressOut={() => setProfileModalVisible(false)}
-                    >
-                      <View style={styles.modalContent}>
-                        {profiles.map((p) => (
-                          <Pressable
-                            key={p}
-                            style={styles.modalOption}
-                            onPress={() => {
-                              setProfile(p);
-                              setProfileModalVisible(false);
-                            }}
-                          >
-                            <Text style={[styles.pickerText, profile === p && styles.selectedOption]}>{p}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </TouchableOpacity>
-                  </Modal>
                 </View>
 
                 {/* Botão de submissão (chama handleLogin) */}
@@ -228,43 +185,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
-  },
-  pickerButton: {
-    borderWidth: 1,
-    borderColor: '#D8E2EE',
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  pickerText: {
-    color: '#10233F',
-    fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    padding: 24,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 8,
-    elevation: 10,
-  },
-  modalOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  selectedOption: {
-    fontWeight: '800',
-    color: '#004A8D',
   },
   gradient: {
     flex: 1,
