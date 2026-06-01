@@ -1,8 +1,54 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
+// Importações das novas bibliotecas que instalamos
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
+import * as DocumentPicker from 'expo-document-picker';
 
 export default function AdicionarAtividade() {
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+
+  // Estados para capturar os dados do formulário
+  const [curso, setCurso] = useState('ADS');
+  const [area, setArea] = useState('Cultura');
+  
+  // Estados da Data
+  const [data, setData] = useState(new Date());
+  const [mostrarCalendario, setMostrarCalendario] = useState(false);
+
+  // Estado do Arquivo
+  const [arquivo, setArquivo] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+
+  // Função disparada quando o usuário escolhe uma data no calendário
+  const aoMudarData = (event: any, dataSelecionada?: Date) => {
+    const dataAtual = dataSelecionada || data;
+    // No Android, o calendário fecha sozinho. No iOS, precisamos controlar isso.
+    setMostrarCalendario(Platform.OS === 'ios');
+    setData(dataAtual);
+  };
+
+  // Função para abrir os arquivos do celular
+  const escolherArquivo = async () => {
+    try {
+      const resultado = await DocumentPicker.getDocumentAsync({
+        type: '*/*', // Permite qualquer arquivo (PDF, JPG, PNG, etc)
+        copyToCacheDirectory: true,
+      });
+
+      if (!resultado.canceled) {
+        setArquivo(resultado.assets[0]); // Salva o arquivo escolhido
+      }
+    } catch (erro) {
+      console.log('Erro ao escolher arquivo:', erro);
+    }
+  };
+
+  // Formatador simples para exibir a data na tela (dd/mm/aaaa)
+  const dataFormatada = data.toLocaleDateString('pt-BR');
+
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Stack.Screen options={{ title: 'Adicionar Atividade' }} />
@@ -13,34 +59,152 @@ export default function AdicionarAtividade() {
         <Text style={styles.subtitle}>Registre uma nova atividade complementar</Text>
       </View>
 
-      <View style={styles.beforeCard}>
-        <View style={styles.beforeIconWrap}>
-          <MaterialIcons name="check-circle" size={22} color="#2CC36B" />
+      {!mostrarFormulario ? (
+        <>
+          <View style={styles.beforeCard}>
+            <View style={styles.beforeIconWrap}>
+              <MaterialIcons name="check-circle" size={22} color="#2CC36B" />
+            </View>
+
+            <View style={styles.beforeTextBlock}>
+              <Text style={styles.beforeTitle}>Antes de enviar:</Text>
+              <Text style={styles.beforeDescription}>
+                Preencha os dados obrigatórios e adicione o comprovante da atividade.
+              </Text>
+            </View>
+          </View>
+
+          <Pressable style={styles.primaryButton} onPress={() => setMostrarFormulario(true)}>
+            <Text style={styles.primaryButtonText}>Preencher Formulário</Text>
+          </Pressable>
+        </>
+      ) : (
+        <View style={styles.formContainer}>
+          <Text style={styles.formTitle}>Nova Atividade</Text>
+
+          {/* Seletor Real: Curso */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Curso</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={curso}
+                onValueChange={(itemValue) => setCurso(itemValue)}
+                style={styles.picker}
+              >
+                <Picker.Item label="Análise e Desenvolvimento de Sistemas (ADS)" value="ADS" />
+                <Picker.Item label="Redes de Computadores" value="Redes" />
+                <Picker.Item label="Sistemas de Informação" value="SI" />
+                <Picker.Item label="Gestão de TI" value="GTI" />
+              </Picker>
+            </View>
+          </View>
+
+          {/* Seletor Real: Área */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Área</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={area}
+                onValueChange={(itemValue) => setArea(itemValue)}
+                style={styles.picker}
+              >
+                <Picker.Item label="Cultura" value="Cultura" />
+                <Picker.Item label="Esportes" value="Esportes" />
+                <Picker.Item label="Pesquisa" value="Pesquisa" />
+                <Picker.Item label="Voluntariado" value="Voluntariado" />
+                <Picker.Item label="Tecnologia" value="Tecnologia" />
+              </Picker>
+            </View>
+          </View>
+
+          {/* Título e Carga Horária (mantidos como texto) */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Título</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="Ex: Monitoria de Lógica" 
+              placeholderTextColor="#90A4AE"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Carga Horária (horas)</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="Ex: 20" 
+              keyboardType="numeric"
+              placeholderTextColor="#90A4AE"
+            />
+          </View>
+
+          {/* Calendário Funcional */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Data da Atividade</Text>
+            <Pressable 
+              style={styles.dateInputFake} 
+              onPress={() => setMostrarCalendario(true)}
+            >
+              <Text style={styles.dateText}>{dataFormatada}</Text>
+              <MaterialIcons name="calendar-today" size={20} color="#60748A" />
+            </Pressable>
+
+            {/* O componente do calendário só aparece se mostrarCalendario for true */}
+            {mostrarCalendario && (
+              <DateTimePicker
+                value={data}
+                mode="date"
+                display="default"
+                onChange={aoMudarData}
+              />
+            )}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Descrição</Text>
+            <TextInput 
+              style={[styles.input, styles.textArea]} 
+              placeholder="Descreva brevemente a atividade (opcional)" 
+              placeholderTextColor="#90A4AE"
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+
+          {/* Seletor de Arquivos Funcional */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Certificado / Comprovante (obrigatório)</Text>
+            <View style={styles.fileInputRow}>
+              <Pressable style={styles.fileButton} onPress={escolherArquivo}>
+                <Text style={styles.fileButtonText}>Escolher arquivo</Text>
+              </Pressable>
+              
+              {/* Exibe o nome do arquivo se selecionado, senão exibe a mensagem padrão */}
+              <Text style={styles.fileNameText} numberOfLines={1} ellipsizeMode="middle">
+                {arquivo ? arquivo.name : 'Nenhum arquivo escolhido'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.actionButtonsRow}>
+            <Pressable 
+              style={styles.cancelButton} 
+              onPress={() => setMostrarFormulario(false)} 
+            >
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </Pressable>
+            
+            <Pressable style={styles.submitButton}>
+              <Text style={styles.submitButtonText}>Enviar Solicitação</Text>
+            </Pressable>
+          </View>
+
         </View>
-
-        <View style={styles.beforeTextBlock}>
-          <Text style={styles.beforeTitle}>Antes de enviar:</Text>
-          <Text style={styles.beforeDescription}>
-            Preencha os dados obrigatórios e adicione o comprovante da atividade.
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.primaryButton}>
-        <Text style={styles.primaryButtonText}>Preencher Formulário</Text>
-      </View>
-
-      <View style={styles.stepsList}>
-        <StepCard number="1" title="Preencha os dados" />
-        <StepCard number="2" title="Anexe o comprovante" />
-        <StepCard number="3" title="Aguarde validação" />
-      </View>
+      )}
 
       <View style={styles.studentCard}>
         <View style={styles.studentIconWrap}>
           <MaterialIcons name="person" size={20} color="#5C3E99" />
         </View>
-
         <View style={styles.studentTextBlock}>
           <Text style={styles.studentTitle}>Aluno</Text>
           <Text style={styles.studentEmail}>ana.beatriz@gmail.com</Text>
@@ -49,22 +213,6 @@ export default function AdicionarAtividade() {
 
       <Text style={styles.footer}>© 2026 SGAC - Sistema de Gestão de Atividades Complementares</Text>
     </ScrollView>
-  );
-}
-
-type StepCardProps = {
-  number: string;
-  title: string;
-};
-
-function StepCard({ number, title }: StepCardProps) {
-  return (
-    <View style={styles.stepCard}>
-      <View style={styles.stepNumberWrap}>
-        <Text style={styles.stepNumber}>{number}</Text>
-      </View>
-      <Text style={styles.stepTitle}>{title}</Text>
-    </View>
   );
 }
 
@@ -154,43 +302,131 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
   },
-  stepsList: {
-    gap: 10,
-  },
-  stepCard: {
+  formContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    borderRadius: 20,
+    padding: 20,
+    gap: 16,
+    shadowColor: '#0F335C',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E4ECF6',
+  },
+  formTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#10233F',
+    marginBottom: 4,
+  },
+  inputGroup: {
+    gap: 8,
+  },
+  label: {
+    fontSize: 13,
+    color: '#10233F',
+    fontWeight: '700',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#DCE6F0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#10233F',
+    backgroundColor: '#FFFFFF',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#DCE6F0',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+    color: '#10233F',
+  },
+  dateInputFake: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DCE6F0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 14, // Aumentado um pouco para bater com a altura dos outros campos
+    backgroundColor: '#FFFFFF',
+  },
+  dateText: {
+    fontSize: 14,
+    color: '#10233F',
+  },
+  fileInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     borderWidth: 1,
-    borderColor: '#E2EAF3',
-    shadowColor: '#10345F',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    borderColor: '#DCE6F0',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
   },
-  stepNumberWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EAF2FB',
+  fileButton: {
+    backgroundColor: '#F5F8FC',
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderRightWidth: 1,
+    borderRightColor: '#DCE6F0',
   },
-  stepNumber: {
-    color: '#2F66F2',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  stepTitle: {
+  fileButtonText: {
+    fontSize: 13,
     color: '#10233F',
-    fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
+  },
+  fileNameText: {
     flex: 1,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    color: '#5D7086',
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 8,
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F07C2B',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    color: '#F07C2B',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  submitButton: {
+    backgroundColor: '#2F66F2',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14,
   },
   studentCard: {
     backgroundColor: '#FFFFFF',
