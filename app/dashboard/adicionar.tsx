@@ -54,7 +54,7 @@ export default function AdicionarAtividade() {
       <Stack.Screen options={{ title: 'Adicionar Atividade' }} />
 
       <View style={styles.pageHeader}>
-        <Text style={styles.kicker}>ATIVIDADES COMPLEMENTARES10</Text>
+        <Text style={styles.kicker}>ATIVIDADES COMPLEMENTARES</Text>
         <Text style={styles.title}>Adicionar Atividade</Text>
         <Text style={styles.subtitle}>Registre uma nova atividade complementar</Text>
       </View>
