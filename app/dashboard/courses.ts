@@ -1,11 +1,15 @@
+type Categoria = {
+  nome: string;
+  limiteHoras: number;
+  horasCumpridas: number;
+};
+
 export const COURSES = {
   ADS: {
     sigla: "ADS",
     nome: "Análise e Desenvolvimento de Sistemas",
-
     sobre:
       "Curso voltado ao desenvolvimento de software, banco de dados, computação em nuvem, experiência do usuário e inovação tecnológica.",
-
     conteudo: [
       "Algoritmos",
       "Estrutura de Dados",
@@ -18,24 +22,24 @@ export const COURSES = {
       "Data Science",
       "Inteligência Artificial"
     ],
-
     materiais: [
       "Apostilas",
       "Slides",
       "Vídeos",
       "Projetos"
     ],
-
-    progresso: 35
+    progresso: 35,
+    categorias: [
+      { nome: 'Ensino',                         limiteHoras: 40, horasCumpridas: 14 },
+      { nome: 'Pesquisa e Iniciação Científica', limiteHoras: 60, horasCumpridas: 20 },
+      { nome: 'Extensão Social',                limiteHoras: 40, horasCumpridas: 0  },
+    ] as Categoria[],
   },
-
   Redes: {
     sigla: "Redes",
     nome: "Redes de Computadores",
-
     sobre:
       "Curso focado em infraestrutura de TI, administração de redes, virtualização, cloud computing e segurança.",
-
     conteudo: [
       "TCP/IP",
       "Linux",
@@ -46,24 +50,24 @@ export const COURSES = {
       "Virtualização",
       "Segurança de Redes"
     ],
-
     materiais: [
       "Laboratórios",
       "PDFs",
       "Vídeos",
       "Tutoriais"
     ],
-
-    progresso: 20
+    progresso: 20,
+    categorias: [
+      { nome: 'Ensino',                         limiteHoras: 40, horasCumpridas: 8 },
+      { nome: 'Pesquisa e Iniciação Científica', limiteHoras: 60, horasCumpridas: 0 },
+      { nome: 'Extensão Social',                limiteHoras: 40, horasCumpridas: 0 },
+    ] as Categoria[],
   },
-
   SI: {
     sigla: "SI",
     nome: "Sistemas de Informação",
-
     sobre:
       "Curso que integra tecnologia e gestão empresarial para desenvolvimento de soluções digitais.",
-
     conteudo: [
       "Programação",
       "Banco de Dados",
@@ -72,24 +76,24 @@ export const COURSES = {
       "Business Intelligence",
       "Ciência de Dados"
     ],
-
     materiais: [
       "Apostilas",
       "Slides",
       "Cases",
       "Projetos"
     ],
-
-    progresso: 50
+    progresso: 50,
+    categorias: [
+      { nome: 'Ensino',                         limiteHoras: 40, horasCumpridas: 20 },
+      { nome: 'Pesquisa e Iniciação Científica', limiteHoras: 60, horasCumpridas: 30 },
+      { nome: 'Extensão Social',                limiteHoras: 40, horasCumpridas: 10 },
+    ] as Categoria[],
   },
-
   GTI: {
     sigla: "GTI",
     nome: "Gestão de TI",
-
     sobre:
       "Curso focado em liderança, governança, segurança da informação e transformação digital.",
-
     conteudo: [
       "Governança de TI",
       "Gestão de Projetos",
@@ -98,14 +102,17 @@ export const COURSES = {
       "Segurança da Informação",
       "Métodos Ágeis"
     ],
-
     materiais: [
       "Artigos",
       "PDFs",
       "Vídeos",
       "Workshops"
     ],
-
-    progresso: 10
-  }
+    progresso: 10,
+    categorias: [
+      { nome: 'Ensino',                         limiteHoras: 40, horasCumpridas: 4 },
+      { nome: 'Pesquisa e Iniciação Científica', limiteHoras: 60, horasCumpridas: 0 },
+      { nome: 'Extensão Social',                limiteHoras: 40, horasCumpridas: 0 },
+    ] as Categoria[],
+  },
 };
