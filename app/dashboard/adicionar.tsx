@@ -1,53 +1,146 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
-import React, { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-
-// Importações das novas bibliotecas que instalamos
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { Stack, useRouter } from 'expo-router';
+import { useState } from 'react';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+
+import { useAtividades } from './AtividadesContext';
 
 export default function AdicionarAtividade() {
+  // Permite mudar de tela
+  const router = useRouter();
+
+  // Pega a função que salva a atividade
+  const { adicionarAtividade } = useAtividades();
+
+  // Controla se o formulário aparece ou não
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
-  // Estados para capturar os dados do formulário
+  // Guarda o curso selecionado
   const [curso, setCurso] = useState('ADS');
+
+  // Guarda a área selecionada
   const [area, setArea] = useState('Cultura');
-  
-  // Estados da Data
+
+  // Guarda o título digitado
+  const [titulo, setTitulo] = useState('');
+
+  // Guarda a carga horária digitada
+  const [cargaHoraria, setCargaHoraria] = useState('');
+
+  // Guarda a descrição digitada
+  const [descricao, setDescricao] = useState('');
+
+  // Guarda a data escolhida
   const [data, setData] = useState(new Date());
+
+  // Controla se o calendário aparece
   const [mostrarCalendario, setMostrarCalendario] = useState(false);
 
-  // Estado do Arquivo
+  // Guarda o arquivo escolhido
   const [arquivo, setArquivo] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
 
-  // Função disparada quando o usuário escolhe uma data no calendário
-  const aoMudarData = (event: any, dataSelecionada?: Date) => {
+  // Função chamada quando o usuário escolhe uma data
+  function aoMudarData(_event: unknown, dataSelecionada?: Date) {
     const dataAtual = dataSelecionada || data;
-    // No Android, o calendário fecha sozinho. No iOS, precisamos controlar isso.
-    setMostrarCalendario(Platform.OS === 'ios');
-    setData(dataAtual);
-  };
 
-  // Função para abrir os arquivos do celular
-  const escolherArquivo = async () => {
+    // No Android fecha o calendário, no iOS mantém aberto
+    setMostrarCalendario(Platform.OS === 'ios');
+
+    // Salva a data escolhida
+    setData(dataAtual);
+  }
+
+  // Abre o seletor de arquivos do celular
+  async function escolherArquivo() {
     try {
       const resultado = await DocumentPicker.getDocumentAsync({
-        type: '*/*', // Permite qualquer arquivo (PDF, JPG, PNG, etc)
+        type: '*/*',
         copyToCacheDirectory: true,
       });
 
+      // Se o usuário escolheu um arquivo, salva ele no estado
       if (!resultado.canceled) {
-        setArquivo(resultado.assets[0]); // Salva o arquivo escolhido
+        setArquivo(resultado.assets[0]);
       }
     } catch (erro) {
       console.log('Erro ao escolher arquivo:', erro);
+      Alert.alert('Erro', 'Não foi possível escolher o arquivo.');
     }
-  };
+  }
 
-  // Formatador simples para exibir a data na tela (dd/mm/aaaa)
+  // Mostra a data no formato brasileiro
   const dataFormatada = data.toLocaleDateString('pt-BR');
+
+  // Formata a data para salvar como ano-mês-dia
+  function formatarDataISO(dataSelecionada: Date) {
+    const ano = dataSelecionada.getFullYear();
+    const mes = String(dataSelecionada.getMonth() + 1).padStart(2, '0');
+    const dia = String(dataSelecionada.getDate()).padStart(2, '0');
+
+    return `${ano}-${mes}-${dia}`;
+  }
+
+  // Limpa o formulário
+  function limparFormulario() {
+    setMostrarFormulario(false);
+    setTitulo('');
+    setCargaHoraria('');
+    setDescricao('');
+    setData(new Date());
+    setArquivo(null);
+  }
+
+  // Envia a atividade para Minhas Atividades
+  function enviarSolicitacao() {
+    const horas = Number(cargaHoraria.replace(',', '.'));
+
+    if (!titulo.trim()) {
+      Alert.alert('Atenção', 'Preencha o título da atividade.');
+      return;
+    }
+
+    if (!horas || horas <= 0) {
+      Alert.alert('Atenção', 'Informe uma carga horária válida.');
+      return;
+    }
+
+    if (!arquivo) {
+      Alert.alert('Atenção', 'Escolha o certificado ou comprovante da atividade.');
+      return;
+    }
+
+    // Salva a atividade no Context
+    adicionarAtividade({
+      curso,
+      area,
+      titulo: titulo.trim(),
+      cargaHoraria: horas,
+      dataAtividade: formatarDataISO(data),
+      descricao: descricao.trim(),
+      comprovanteNome: arquivo.name,
+    });
+
+    // Limpa os campos
+    limparFormulario();
+
+    // Mostra mensagem
+    Alert.alert('Sucesso', 'Solicitação enviada para análise.');
+
+    // Vai para a página Minhas Atividades
+    router.push('/dashboard/minhas-atividades');
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -82,13 +175,13 @@ export default function AdicionarAtividade() {
         <View style={styles.formContainer}>
           <Text style={styles.formTitle}>Nova Atividade</Text>
 
-          {/* Seletor Real: Curso */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Curso</Text>
+
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={curso}
-                onValueChange={(itemValue) => setCurso(itemValue)}
+                onValueChange={(itemValue) => setCurso(String(itemValue))}
                 style={styles.picker}
               >
                 <Picker.Item label="Análise e Desenvolvimento de Sistemas (ADS)" value="ADS" />
@@ -99,13 +192,13 @@ export default function AdicionarAtividade() {
             </View>
           </View>
 
-          {/* Seletor Real: Área */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Área</Text>
+
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={area}
-                onValueChange={(itemValue) => setArea(itemValue)}
+                onValueChange={(itemValue) => setArea(String(itemValue))}
                 style={styles.picker}
               >
                 <Picker.Item label="Cultura" value="Cultura" />
@@ -117,38 +210,39 @@ export default function AdicionarAtividade() {
             </View>
           </View>
 
-          {/* Título e Carga Horária (mantidos como texto) */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Título</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="Ex: Monitoria de Lógica" 
+
+            <TextInput
+              style={styles.input}
+              value={titulo}
+              onChangeText={setTitulo}
+              placeholder="Ex: Monitoria de Lógica"
               placeholderTextColor="#90A4AE"
             />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Carga Horária (horas)</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="Ex: 20" 
+
+            <TextInput
+              style={styles.input}
+              value={cargaHoraria}
+              onChangeText={setCargaHoraria}
+              placeholder="Ex: 20"
               keyboardType="numeric"
               placeholderTextColor="#90A4AE"
             />
           </View>
 
-          {/* Calendário Funcional */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Data da Atividade</Text>
-            <Pressable 
-              style={styles.dateInputFake} 
-              onPress={() => setMostrarCalendario(true)}
-            >
+
+            <Pressable style={styles.dateInputFake} onPress={() => setMostrarCalendario(true)}>
               <Text style={styles.dateText}>{dataFormatada}</Text>
               <MaterialIcons name="calendar-today" size={20} color="#60748A" />
             </Pressable>
 
-            {/* O componente do calendário só aparece se mostrarCalendario for true */}
             {mostrarCalendario && (
               <DateTimePicker
                 value={data}
@@ -161,24 +255,26 @@ export default function AdicionarAtividade() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Descrição</Text>
-            <TextInput 
-              style={[styles.input, styles.textArea]} 
-              placeholder="Descreva brevemente a atividade (opcional)" 
+
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={descricao}
+              onChangeText={setDescricao}
+              placeholder="Descreva brevemente a atividade (opcional)"
               placeholderTextColor="#90A4AE"
               multiline
               numberOfLines={4}
             />
           </View>
 
-          {/* Seletor de Arquivos Funcional */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Certificado / Comprovante (obrigatório)</Text>
+
             <View style={styles.fileInputRow}>
               <Pressable style={styles.fileButton} onPress={escolherArquivo}>
                 <Text style={styles.fileButtonText}>Escolher arquivo</Text>
               </Pressable>
-              
-              {/* Exibe o nome do arquivo se selecionado, senão exibe a mensagem padrão */}
+
               <Text style={styles.fileNameText} numberOfLines={1} ellipsizeMode="middle">
                 {arquivo ? arquivo.name : 'Nenhum arquivo escolhido'}
               </Text>
@@ -186,18 +282,14 @@ export default function AdicionarAtividade() {
           </View>
 
           <View style={styles.actionButtonsRow}>
-            <Pressable 
-              style={styles.cancelButton} 
-              onPress={() => setMostrarFormulario(false)} 
-            >
+            <Pressable style={styles.cancelButton} onPress={limparFormulario}>
               <Text style={styles.cancelButtonText}>Cancelar</Text>
             </Pressable>
-            
-            <Pressable style={styles.submitButton}>
+
+            <Pressable style={styles.submitButton} onPress={enviarSolicitacao}>
               <Text style={styles.submitButtonText}>Enviar Solicitação</Text>
             </Pressable>
           </View>
-
         </View>
       )}
 
@@ -205,13 +297,16 @@ export default function AdicionarAtividade() {
         <View style={styles.studentIconWrap}>
           <MaterialIcons name="person" size={20} color="#5C3E99" />
         </View>
+
         <View style={styles.studentTextBlock}>
           <Text style={styles.studentTitle}>Aluno</Text>
           <Text style={styles.studentEmail}>ana.beatriz@gmail.com</Text>
         </View>
       </View>
 
-      <Text style={styles.footer}>© 2026 SGAC - Sistema de Gestão de Atividades Complementares</Text>
+      <Text style={styles.footer}>
+        © 2026 SGAC - Sistema de Gestão de Atividades Complementares
+      </Text>
     </ScrollView>
   );
 }
@@ -363,7 +458,7 @@ const styles = StyleSheet.create({
     borderColor: '#DCE6F0',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 14, // Aumentado um pouco para bater com a altura dos outros campos
+    paddingVertical: 14,
     backgroundColor: '#FFFFFF',
   },
   dateText: {

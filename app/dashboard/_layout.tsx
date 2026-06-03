@@ -12,14 +12,22 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+
+import { AtividadesProvider } from './AtividadesContext';
 import { CursoProvider } from './CursoContext';
 
+type DashboardHref =
+  | '/dashboard'
+  | '/dashboard/cursos'
+  | '/dashboard/adicionar'
+  | '/dashboard/minhas-atividades'
+  | '/dashboard/regras-do-curso';
+
 type NavItem = {
-  href: string;
+  href: DashboardHref;
   label: string;
   icon: keyof typeof MaterialIcons.glyphMap;
 };
-
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Início', icon: 'home' },
   { href: '/dashboard/cursos', label: 'Cursos', icon: 'school' },
@@ -37,10 +45,10 @@ function DashboardLayoutContent() {
 
   const drawerWidth = useMemo(() => Math.min(320, Math.round(width * 0.82)), [width]);
 
-  const navigateTo = (href: string) => {
-    setDrawerVisible(false);
-    router.push(href);
-  };
+  const navigateTo = (href: DashboardHref) => {
+  setDrawerVisible(false);
+  router.push(href);
+};
 
   const handleLogout = () => {
     setDrawerVisible(false);
@@ -95,8 +103,13 @@ function DashboardLayoutContent() {
 
 export default function DashboardLayout() {
   return (
+    // Provider que guarda o curso escolhido
     <CursoProvider>
-      <DashboardLayoutContent />
+      {/* Provider que guarda as atividades enviadas */}
+      <AtividadesProvider>
+        {/* Conteúdo das telas do dashboard */}
+        <DashboardLayoutContent />
+      </AtividadesProvider>
     </CursoProvider>
   );
 }
@@ -104,16 +117,15 @@ export default function DashboardLayout() {
 type SidebarProps = {
   variant: 'desktop' | 'mobile';
   pathname: string;
-  onNavigate: (href: string) => void;
+  onNavigate: (href: DashboardHref) => void;
   onLogout: () => void;
 };
 
 type NavListProps = {
   variant: 'desktop' | 'mobile';
   pathname: string;
-  onNavigate: (href: string) => void;
+  onNavigate: (href: DashboardHref) => void;
 };
-
 function Sidebar({ variant, pathname, onNavigate, onLogout }: SidebarProps) {
   const isMobile = variant === 'mobile';
 
