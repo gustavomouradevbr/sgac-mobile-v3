@@ -12,16 +12,13 @@ No terminal, execute:
 # 1. Baixe o projeto e acesse a pasta
 git clone https://github.com/gustavomouradevbr/sgac-mobile-v3
 
-# 2. Acesse a pasta
-cd sgac-mobile-v3
+# 2. Instale as dependências
+npm install
 
 # 3. Istale as bibliotecas
 npx expo install @react-native-picker/picker @react-native-community/datetimepicker expo-document-picker
 
-# 4. Instale as dependências
-npm install
-
-# 5. Inicie o servidor
+# 4. Inicie o servidor
 npx expo start
 
 ```
