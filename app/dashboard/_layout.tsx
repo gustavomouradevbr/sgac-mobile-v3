@@ -2,15 +2,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-  Image,
-  Modal,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+    Image,
+    Modal,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions,
 } from 'react-native';
 
 import { AtividadesProvider } from './AtividadesContext';
@@ -18,7 +18,6 @@ import { CursoProvider } from './CursoContext';
 
 type DashboardHref =
   | '/dashboard'
-  | '/dashboard/cursos'
   | '/dashboard/adicionar'
   | '/dashboard/minhas-atividades'
   | '/dashboard/regras-do-curso';
@@ -30,8 +29,7 @@ type NavItem = {
 };
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Início', icon: 'home' },
-  { href: '/dashboard/cursos', label: 'Cursos', icon: 'school' },
-  { href: '/dashboard/adicionar', label: 'Adicionar', icon: 'add' },
+  { href: '/dashboard/adicionar', label: 'Adicionar Atividade', icon: 'add' },
   { href: '/dashboard/minhas-atividades', label: 'Minhas Atividades', icon: 'assignment' },
   { href: '/dashboard/regras-do-curso', label: 'Regras do Curso', icon: 'menu-book' },
 ];
