@@ -3,6 +3,8 @@
 import { useRouter } from 'expo-router'; // Router do Expo para navegação entre telas
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -12,7 +14,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from 'react-native';
 
 export default function LoginScreen() {
@@ -21,11 +23,43 @@ export default function LoginScreen() {
   // Estados locais para os campos do formulário
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // Função chamada ao pressionar o botão Entrar
-  // Atualmente apenas navega para a tela /dashboard
-  const handleLogin = () => {
-    router.push('/dashboard/adicionar');
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Atenção', 'Por favor, preencha todos os campos.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      const response = await fetch('https://api-sgac-gustavo.onrender.com/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          senha: password,
+        }),
+      });
+
+      if (response.status === 200) {
+        const data = await response.json();
+        console.log('Login efetuado com sucesso:', data);
+        router.push('/dashboard');
+        return;
+      }
+
+      Alert.alert('Falha no Login', 'E-mail ou senha incorretos.');
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Erro de Conexão', 'Não foi possível conectar ao servidor do Render.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -88,8 +122,12 @@ export default function LoginScreen() {
                 </View>
 
                 {/* Botão de submissão (chama handleLogin) */}
-                <Pressable style={styles.button} onPress={handleLogin}>
-                  <Text style={styles.buttonText}>Entrar</Text>
+                <Pressable style={styles.button} onPress={handleLogin} disabled={isLoading}>
+                  {isLoading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.buttonText}>Entrar</Text>
+                  )}
                 </Pressable>
               </View>
             </View>
