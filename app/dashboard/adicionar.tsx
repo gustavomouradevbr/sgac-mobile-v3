@@ -1,78 +1,69 @@
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 
-import { useAtividades } from './AtividadesContext';
-
 export default function AdicionarAtividade() {
-  // Permite mudar de tela
-  const router = useRouter();
-
-  // Pega a função que salva a atividade
-  const { adicionarAtividade } = useAtividades();
-
-  // Controla se o formulário aparece ou não
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-
-  // Guarda o curso selecionado
-  const [curso, setCurso] = useState('ADS');
-
-  // Guarda a área selecionada
-  const [area, setArea] = useState('Cultura');
-
-  // Guarda o título digitado
+  const [regraId, setRegraId] = useState('1');
   const [titulo, setTitulo] = useState('');
-
-  // Guarda a carga horária digitada
-  const [cargaHoraria, setCargaHoraria] = useState('');
-
-  // Guarda a descrição digitada
   const [descricao, setDescricao] = useState('');
-
-  // Guarda a data escolhida
-  const [data, setData] = useState(new Date());
-
-  // Controla se o calendário aparece
+  const [horasSolicitadas, setHorasSolicitadas] = useState('');
+  const [dataAtividade, setDataAtividade] = useState('');
+  const [dataSelecionada, setDataSelecionada] = useState(new Date());
   const [mostrarCalendario, setMostrarCalendario] = useState(false);
+  const [arquivoSelecionado, setArquivoSelecionado] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Guarda o arquivo escolhido
-  const [arquivo, setArquivo] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
-
-  // Função chamada quando o usuário escolhe uma data
-  function aoMudarData(_event: unknown, dataSelecionada?: Date) {
-    const dataAtual = dataSelecionada || data;
-
-    // No Android fecha o calendário, no iOS mantém aberto
-    setMostrarCalendario(Platform.OS === 'ios');
-
-    // Salva a data escolhida
-    setData(dataAtual);
+  function formatarDataISO(data: Date) {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
   }
 
-  // Abre o seletor de arquivos do celular
-  async function escolherArquivo() {
+  function formatarDataBrasil(dataISO: string) {
+    if (!dataISO) {
+      return 'Selecionar data';
+    }
+
+    const [ano, mes, dia] = dataISO.split('-');
+    if (!ano || !mes || !dia) {
+      return 'Selecionar data';
+    }
+
+    return `${dia}/${mes}/${ano}`;
+  }
+
+  function aoMudarData(_event: unknown, dataSelecionadaNova?: Date) {
+    const dataAtual = dataSelecionadaNova || dataSelecionada;
+    setMostrarCalendario(Platform.OS === 'ios');
+    setDataSelecionada(dataAtual);
+    setDataAtividade(formatarDataISO(dataAtual));
+  }
+
+  async function selecionarArquivo() {
     try {
       const resultado = await DocumentPicker.getDocumentAsync({
         type: '*/*',
         copyToCacheDirectory: true,
       });
 
-      // Se o usuário escolheu um arquivo, salva ele no estado
-      if (!resultado.canceled) {
-        setArquivo(resultado.assets[0]);
+      if (!resultado.canceled && resultado.assets?.length) {
+        setArquivoSelecionado(resultado.assets[0]);
       }
     } catch (erro) {
       console.log('Erro ao escolher arquivo:', erro);
@@ -80,66 +71,96 @@ export default function AdicionarAtividade() {
     }
   }
 
-  // Mostra a data no formato brasileiro
-  const dataFormatada = data.toLocaleDateString('pt-BR');
-
-  // Formata a data para salvar como ano-mês-dia
-  function formatarDataISO(dataSelecionada: Date) {
-    const ano = dataSelecionada.getFullYear();
-    const mes = String(dataSelecionada.getMonth() + 1).padStart(2, '0');
-    const dia = String(dataSelecionada.getDate()).padStart(2, '0');
-
-    return `${ano}-${mes}-${dia}`;
-  }
-
-  // Limpa o formulário
   function limparFormulario() {
-    setMostrarFormulario(false);
+    setRegraId('1');
     setTitulo('');
-    setCargaHoraria('');
     setDescricao('');
-    setData(new Date());
-    setArquivo(null);
+    setHorasSolicitadas('');
+    setDataAtividade('');
+    setDataSelecionada(new Date());
+    setMostrarCalendario(false);
+    setArquivoSelecionado(null);
   }
 
-  // Envia a atividade para Minhas Atividades
-  function enviarSolicitacao() {
-    const horas = Number(cargaHoraria.replace(',', '.'));
+  async function enviarAtividade() {
+    const tituloLimpo = titulo.trim();
+    const descricaoLimpa = descricao.trim();
+    const horasNumero = Number(String(horasSolicitadas).replace(',', '.'));
 
-    if (!titulo.trim()) {
-      Alert.alert('Atenção', 'Preencha o título da atividade.');
+    if (!regraId || !tituloLimpo || !descricaoLimpa || !horasSolicitadas || !dataAtividade || !arquivoSelecionado) {
+      Alert.alert('Atenção', 'Preencha todos os campos e selecione um arquivo para continuar.');
       return;
     }
 
-    if (!horas || horas <= 0) {
-      Alert.alert('Atenção', 'Informe uma carga horária válida.');
+    if (!Number.isFinite(horasNumero) || horasNumero <= 0) {
+      Alert.alert('Atenção', 'Informe uma quantidade válida de horas solicitadas.');
       return;
     }
 
-    if (!arquivo) {
-      Alert.alert('Atenção', 'Escolha o certificado ou comprovante da atividade.');
+    const userId = await AsyncStorage.getItem('userId');
+    const userToken = await AsyncStorage.getItem('userToken');
+
+    if (!userId || !userToken) {
+      Alert.alert('Sessão expirada', 'Não foi possível encontrar os dados do utilizador. Faça login novamente.');
       return;
     }
 
-    // Salva a atividade no Context
-    adicionarAtividade({
-      curso,
-      area,
-      titulo: titulo.trim(),
-      cargaHoraria: horas,
-      dataAtividade: formatarDataISO(data),
-      descricao: descricao.trim(),
-      comprovanteNome: arquivo.name,
-    });
+    const formData = new FormData();
+    formData.append(
+      'dados',
+      JSON.stringify({
+        alunoId: Number(userId),
+        regraId: Number(regraId),
+        titulo: tituloLimpo,
+        descricao: descricaoLimpa,
+        horasSolicitadas: Number(horasNumero),
+        dataAtividade,
+      })
+    );
+    formData.append(
+      'arquivo',
+      {
+        uri: arquivoSelecionado.uri,
+        name: arquivoSelecionado.name,
+        type: arquivoSelecionado.mimeType || 'application/octet-stream',
+      } as any
+    );
 
-    // Limpa os campos
-    limparFormulario();
+    try {
+      setIsLoading(true);
 
-    // Mostra mensagem
-    Alert.alert('Sucesso', 'Solicitação enviada para análise.');
+      const response = await fetch('https://api-sgac-gustavo.onrender.com/api/submissoes', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: formData,
+      });
 
-    // Vai para a página Minhas Atividades
-    router.push('/dashboard/minhas-atividades');
+      if (response.status === 200 || response.status === 201) {
+        Alert.alert('Sucesso', 'Solicitação enviada com sucesso.');
+        limparFormulario();
+        return;
+      }
+
+      let mensagemErro = 'Não foi possível enviar a solicitação.';
+
+      try {
+        const erro = await response.json();
+        if (typeof erro?.message === 'string' && erro.message.trim()) {
+          mensagemErro = erro.message;
+        }
+      } catch {
+        // Mantém a mensagem padrão quando a API não retorna JSON válido.
+      }
+
+      Alert.alert('Falha no envio', mensagemErro);
+    } catch (erro) {
+      console.error('Erro ao enviar atividade:', erro);
+      Alert.alert('Erro', 'Não foi possível enviar a atividade. Verifique a sua conexão e tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -152,146 +173,92 @@ export default function AdicionarAtividade() {
         <Text style={styles.subtitle}>Registre uma nova atividade complementar</Text>
       </View>
 
-      {!mostrarFormulario ? (
-        <>
-          <View style={styles.beforeCard}>
-            <View style={styles.beforeIconWrap}>
-              <MaterialIcons name="check-circle" size={22} color="#2CC36B" />
-            </View>
+      <View style={styles.formContainer}>
+        <Text style={styles.formTitle}>Nova Atividade</Text>
 
-            <View style={styles.beforeTextBlock}>
-              <Text style={styles.beforeTitle}>Antes de enviar:</Text>
-              <Text style={styles.beforeDescription}>
-                Preencha os dados obrigatórios e adicione o comprovante da atividade.
-              </Text>
-            </View>
-          </View>
-
-          <Pressable style={styles.primaryButton} onPress={() => setMostrarFormulario(true)}>
-            <Text style={styles.primaryButtonText}>Preencher Formulário</Text>
-          </Pressable>
-        </>
-      ) : (
-        <View style={styles.formContainer}>
-          <Text style={styles.formTitle}>Nova Atividade</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Curso</Text>
-
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={curso}
-                onValueChange={(itemValue) => setCurso(String(itemValue))}
-                style={styles.picker}
-              >
-                <Picker.Item label="Análise e Desenvolvimento de Sistemas (ADS)" value="ADS" />
-                <Picker.Item label="Redes de Computadores" value="Redes" />
-                <Picker.Item label="Sistemas de Informação" value="SI" />
-                <Picker.Item label="Gestão de TI" value="GTI" />
-              </Picker>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Área</Text>
-
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={area}
-                onValueChange={(itemValue) => setArea(String(itemValue))}
-                style={styles.picker}
-              >
-                <Picker.Item label="Cultura" value="Cultura" />
-                <Picker.Item label="Esportes" value="Esportes" />
-                <Picker.Item label="Pesquisa" value="Pesquisa" />
-                <Picker.Item label="Voluntariado" value="Voluntariado" />
-                <Picker.Item label="Tecnologia" value="Tecnologia" />
-              </Picker>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Título</Text>
-
-            <TextInput
-              style={styles.input}
-              value={titulo}
-              onChangeText={setTitulo}
-              placeholder="Ex: Monitoria de Lógica"
-              placeholderTextColor="#90A4AE"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Carga Horária (horas)</Text>
-
-            <TextInput
-              style={styles.input}
-              value={cargaHoraria}
-              onChangeText={setCargaHoraria}
-              placeholder="Ex: 20"
-              keyboardType="numeric"
-              placeholderTextColor="#90A4AE"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Data da Atividade</Text>
-
-            <Pressable style={styles.dateInputFake} onPress={() => setMostrarCalendario(true)}>
-              <Text style={styles.dateText}>{dataFormatada}</Text>
-              <MaterialIcons name="calendar-today" size={20} color="#60748A" />
-            </Pressable>
-
-            {mostrarCalendario && (
-              <DateTimePicker
-                value={data}
-                mode="date"
-                display="default"
-                onChange={aoMudarData}
-              />
-            )}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Descrição</Text>
-
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={descricao}
-              onChangeText={setDescricao}
-              placeholder="Descreva brevemente a atividade (opcional)"
-              placeholderTextColor="#90A4AE"
-              multiline
-              numberOfLines={4}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Certificado / Comprovante (obrigatório)</Text>
-
-            <View style={styles.fileInputRow}>
-              <Pressable style={styles.fileButton} onPress={escolherArquivo}>
-                <Text style={styles.fileButtonText}>Escolher arquivo</Text>
-              </Pressable>
-
-              <Text style={styles.fileNameText} numberOfLines={1} ellipsizeMode="middle">
-                {arquivo ? arquivo.name : 'Nenhum arquivo escolhido'}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.actionButtonsRow}>
-            <Pressable style={styles.cancelButton} onPress={limparFormulario}>
-              <Text style={styles.cancelButtonText}>Cancelar</Text>
-            </Pressable>
-
-            <Pressable style={styles.submitButton} onPress={enviarSolicitacao}>
-              <Text style={styles.submitButtonText}>Enviar Solicitação</Text>
-            </Pressable>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Regra</Text>
+          <View style={styles.pickerContainer}>
+            <Picker selectedValue={regraId} onValueChange={(itemValue) => setRegraId(String(itemValue))} style={styles.picker}>
+              <Picker.Item label="Regra 1" value="1" />
+              <Picker.Item label="Regra 2" value="2" />
+              <Picker.Item label="Regra 3" value="3" />
+              <Picker.Item label="Regra 4" value="4" />
+            </Picker>
           </View>
         </View>
-      )}
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Título</Text>
+          <TextInput
+            style={styles.input}
+            value={titulo}
+            onChangeText={setTitulo}
+            placeholder="Ex: Monitoria de Lógica"
+            placeholderTextColor="#90A4AE"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Descrição</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={descricao}
+            onChangeText={setDescricao}
+            placeholder="Descreva brevemente a atividade"
+            placeholderTextColor="#90A4AE"
+            multiline
+            numberOfLines={4}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Horas Solicitadas</Text>
+          <TextInput
+            style={styles.input}
+            value={horasSolicitadas}
+            onChangeText={setHorasSolicitadas}
+            placeholder="Ex: 20"
+            keyboardType="numeric"
+            placeholderTextColor="#90A4AE"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Data da Atividade</Text>
+          <Pressable style={styles.dateInputFake} onPress={() => setMostrarCalendario(true)}>
+            <Text style={styles.dateText}>{formatarDataBrasil(dataAtividade)}</Text>
+            <MaterialIcons name="calendar-today" size={20} color="#60748A" />
+          </Pressable>
+
+          {mostrarCalendario && (
+            <DateTimePicker value={dataSelecionada} mode="date" display="default" onChange={aoMudarData} />
+          )}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Certificado / Comprovante (obrigatório)</Text>
+          <View style={styles.fileInputRow}>
+            <Pressable style={styles.fileButton} onPress={selecionarArquivo} disabled={isLoading}>
+              <Text style={styles.fileButtonText}>Escolher arquivo</Text>
+            </Pressable>
+
+            <Text style={styles.fileNameText} numberOfLines={1} ellipsizeMode="middle">
+              {arquivoSelecionado ? arquivoSelecionado.name : 'Nenhum arquivo escolhido'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.actionButtonsRow}>
+          <Pressable style={styles.cancelButton} onPress={limparFormulario} disabled={isLoading}>
+            <Text style={styles.cancelButtonText}>Cancelar</Text>
+          </Pressable>
+
+          <Pressable style={[styles.submitButton, isLoading && styles.submitButtonDisabled]} onPress={enviarAtividade} disabled={isLoading}>
+            {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Enviar Solicitação</Text>}
+          </Pressable>
+        </View>
+      </View>
 
       <View style={styles.studentCard}>
         <View style={styles.studentIconWrap}>
@@ -304,9 +271,7 @@ export default function AdicionarAtividade() {
         </View>
       </View>
 
-      <Text style={styles.footer}>
-        © 2026 SGAC - Sistema de Gestão de Atividades Complementares
-      </Text>
+      <Text style={styles.footer}>© 2026 SGAC - Sistema de Gestão de Atividades Complementares</Text>
     </ScrollView>
   );
 }
@@ -340,62 +305,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     marginTop: 2,
-  },
-  beforeCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    shadowColor: '#0F335C',
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E4ECF6',
-  },
-  beforeIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F5F8FC',
-    borderWidth: 1,
-    borderColor: '#DCE6F0',
-  },
-  beforeTextBlock: {
-    flex: 1,
-    gap: 4,
-  },
-  beforeTitle: {
-    color: '#10233F',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  beforeDescription: {
-    color: '#5D7086',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  primaryButton: {
-    backgroundColor: '#2F66F2',
-    borderRadius: 16,
-    paddingVertical: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#2F66F2',
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
   },
   formContainer: {
     backgroundColor: '#FFFFFF',
@@ -517,6 +426,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     justifyContent: 'center',
+    minWidth: 150,
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    opacity: 0.8,
   },
   submitButtonText: {
     color: '#FFFFFF',

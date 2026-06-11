@@ -1,30 +1,99 @@
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack } from 'expo-router';
-import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useCurso } from './CursoContext';
 import { FiltroCurso } from './FiltroCurso';
 
-const DADOS_MOCK = {
-  'Todos os Cursos': { total: "3", aprovadas: "1", pendentes: "1", reprovadas: "1", progresso: 0.05, horas: 10 },
-  'Análise e Desenvolvimento de Sistemas': { total: "12", aprovadas: "8", pendentes: "2", reprovadas: "2", progresso: 0.4, horas: 80 },
-  'Administração': { total: "5", aprovadas: "4", pendentes: "1", reprovadas: "0", progresso: 0.15, horas: 30 },
-  'Ciência da Computação': { total: "10", aprovadas: "7", pendentes: "2", reprovadas: "1", progresso: 0.6, horas: 120 },
-  'Engenharia de Software': { total: "8", aprovadas: "5", pendentes: "2", reprovadas: "1", progresso: 0.45, horas: 90 },
+type DashboardData = {
+  totalHoras?: number;
+  horasAprovadas?: number;
+  horasPendentes?: number;
+  horasReprovadas?: number;
+  progressoGeral?: number;
 };
 
 export default function DashboardHome() {
   const { cursoAtivo, setCursoAtivo } = useCurso();
-  
-  // Garante o recalculo visual assim que o curso muda no filtro
-  const dados = useMemo(() => {
-    return DADOS_MOCK[cursoAtivo as keyof typeof DADOS_MOCK] || DADOS_MOCK['Todos os Cursos'];
-  }, [cursoAtivo]);
+  const [userName, setUserName] = useState('');
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Logs para você acompanhar no terminal se o clique funcionou
-  console.log("=== RENDERIZAÇÃO DO PAINEL ===");
-  console.log("Curso Selecionado Atual:", cursoAtivo);
-  console.log("Total de Atividades Filtradas:", dados.total);
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadDashboard = async () => {
+      try {
+        const [storedUserId, storedAuthHeader, storedUserName] = await Promise.all([
+          AsyncStorage.getItem('userId'),
+          AsyncStorage.getItem('authHeader'),
+          AsyncStorage.getItem('userName'),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setUserName(storedUserName ?? '');
+
+        if (!storedUserId || !storedAuthHeader) {
+          setDashboardData(null);
+          return;
+        }
+
+        const response = await fetch(`https://api-sgac-gustavo.onrender.com/api/dashboard/aluno/${storedUserId}`, {
+          method: 'GET',
+          headers: {
+            Authorization: storedAuthHeader,
+          },
+        });
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (response.status === 200) {
+          const data: DashboardData = await response.json();
+          setDashboardData(data);
+        } else {
+          setDashboardData(null);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar o painel:', error);
+        if (isMounted) {
+          setDashboardData(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const displayName = userName.trim() ? userName : 'Aluno';
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#004A8D" />
+        <Text style={styles.loadingText}>A carregar o painel...</Text>
+      </View>
+    );
+  }
+
+  const totalHoras = dashboardData?.totalHoras ?? 0;
+  const horasAprovadas = dashboardData?.horasAprovadas ?? 0;
+  const horasPendentes = dashboardData?.horasPendentes ?? 0;
+  const horasReprovadas = dashboardData?.horasReprovadas ?? 0;
+  const progressoGeral = dashboardData?.progressoGeral ?? 0;
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -43,7 +112,7 @@ export default function DashboardHome() {
           <MaterialIcons name="account-circle" size={30} color="#FFFFFF" />
         </View>
         <View style={styles.heroTextBlock}>
-          <Text style={styles.heroTitle}>Olá, Ana Beatriz Santos!</Text>
+          <Text style={styles.heroTitle}>Olá, {displayName}!</Text>
           <Text style={styles.heroSubtitle}>Seu resumo de atividades aparece aqui com um visual limpo e responsivo.</Text>
         </View>
       </View>
@@ -51,28 +120,28 @@ export default function DashboardHome() {
       <View style={styles.metricsGrid}>
         <MetricCard 
           title="Total de Atividades" 
-          value={dados.total} 
+          value={String(totalHoras ?? 0)} 
           icon="emoji-events" 
           iconColor="#5B8DEF" 
           accentColor="#D7E5FF" 
         />
         <MetricCard 
           title="Aprovadas" 
-          value={dados.aprovadas} 
+          value={String(horasAprovadas ?? 0)} 
           icon="check" 
           iconColor="#23B65E" 
           accentColor="#DDF6E8" 
         />
         <MetricCard 
           title="Pendentes" 
-          value={dados.pendentes.toString()} 
+          value={String(horasPendentes ?? 0)} 
           icon="schedule" 
           iconColor="#F39C12" 
           accentColor="#FFF1D8" 
         />
         <MetricCard 
           title="Reprovadas" 
-          value={dados.reprovadas.toString()} 
+          value={String(horasReprovadas ?? 0)} 
           icon="close" 
           iconColor="#3F76FF" 
           accentColor="#E1EBFF" 
@@ -87,14 +156,14 @@ export default function DashboardHome() {
           </View>
 
           <View style={styles.progressPill}>
-            <Text style={styles.progressPillText}>{Math.round(dados.progresso * 100)}%</Text>
+            <Text style={styles.progressPillText}>{progressoGeral ?? 0}%</Text>
           </View>
         </View>
 
-        <ProgressBar progress={dados.progresso} color="#3A76D3" trackColor="#D6DAE3" height={8} />
+        <ProgressBar progressPercent={progressoGeral ?? 0} color="#3A76D3" trackColor="#D6DAE3" height={8} />
 
         <Text style={styles.sectionLegend}>
-          {dados.horas}h concluídas de 200h. Faltam {200 - dados.horas}h.
+          {totalHoras ?? 0}h concluídas de 200h. Faltam {200 - (totalHoras ?? 0)}h.
         </Text>
       </View>
 
@@ -147,16 +216,16 @@ function MetricCard({ title, value, icon, iconColor, accentColor }: MetricCardPr
 }
 
 type ProgressBarProps = {
-  progress: number;
+  progressPercent: number;
   color: string;
   trackColor: string;
   height: number;
 };
 
-function ProgressBar({ progress, color, trackColor, height }: ProgressBarProps) {
+function ProgressBar({ progressPercent, color, trackColor, height }: ProgressBarProps) {
   return (
     <View style={[styles.progressTrack, { backgroundColor: trackColor, height }]}>
-      <View style={[styles.progressFill, { backgroundColor: color, width: `${Math.max(0, Math.min(progress, 1)) * 100}%` }]} />
+      <View style={[styles.progressFill, { backgroundColor: color, width: `${Math.max(0, Math.min(progressPercent, 100))}%` }]} />
     </View>
   );
 }
@@ -184,6 +253,8 @@ function ActionButton({ title, subtitle, backgroundColor, borderColor, textColor
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: 16, paddingBottom: 28, gap: 14 },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F7FB', gap: 12, padding: 24 },
+  loadingText: { color: '#60748A', fontSize: 15, fontWeight: '600' },
   pageHeader: { gap: 4, paddingTop: 4 },
   kicker: { color: '#F07C2B', fontSize: 12, fontWeight: '900', letterSpacing: 1.05, textTransform: 'uppercase' },
   title: { color: '#10233F', fontSize: 28, fontWeight: '900', lineHeight: 34 },

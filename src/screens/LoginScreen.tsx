@@ -16,6 +16,13 @@ import {
   View,
 } from 'react-native';
 
+const buildBasicAuthHeader = (email: string, password: string) => {
+  const credentials = `${email}:${password}`;
+  const encodedCredentials = globalThis.btoa(credentials);
+
+  return `Basic ${encodedCredentials}`;
+};
+
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -58,10 +65,11 @@ export default function LoginScreen() {
 
       if (response.status === 200) {
         const data = await response.json();
+        const authHeader = buildBasicAuthHeader(sanitizedEmail, sanitizedPassword);
 
-        await AsyncStorage.setItem('userToken', String(data.token ?? ''));
-        await AsyncStorage.setItem('userId', String(data.usuarioId ?? ''));
-        await AsyncStorage.setItem('userName', String(data.userName ?? data.nome ?? ''));
+        await AsyncStorage.setItem('authHeader', authHeader);
+        await AsyncStorage.setItem('userId', String(data.id ?? ''));
+        await AsyncStorage.setItem('userName', String(data.nome ?? ''));
 
         router.push('/dashboard');
         return;
