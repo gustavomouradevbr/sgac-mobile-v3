@@ -2,7 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -29,6 +29,7 @@ const AREAS = [
 type AreaValue = typeof AREAS[number]['value'];
 
 export default function AdicionarAtividade() {
+  const router = useRouter();
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [regras, setRegras] = useState<RegraAtividade[]>([]);
   const [cursoSelecionado, setCursoSelecionado] = useState<number | null>(null);
@@ -138,39 +139,43 @@ export default function AdicionarAtividade() {
       return;
     }
 
-    const authHeader = await getAuthHeader();
-
-    const formData = new FormData();
-    formData.append(
-      'dados',
-      JSON.stringify({
-        alunoId: Number(userId),
-        cursoId: cursoSelecionado,
-        titulo: tituloLimpo,
-        descricao: descricaoLimpa,
-        area: areaSelecionada,
-        cargaHoraria: horasNumero,
-        dataAtividade,
-      }) as any
-    );
-    formData.append('arquivo', {
-      uri: arquivoSelecionado.uri,
-      name: arquivoSelecionado.name,
-      type: arquivoSelecionado.mimeType ?? 'application/octet-stream',
-    } as any);
-
     try {
       setIsLoading(true);
+      const authHeader = await getAuthHeader();
+
+      const formData = new FormData();
+      formData.append(
+        'dados',
+        JSON.stringify({
+          alunoId: Number(userId),
+          cursoId: cursoSelecionado,
+          titulo: tituloLimpo,
+          descricao: descricaoLimpa,
+          area: areaSelecionada,
+          cargaHoraria: horasNumero,
+          dataAtividade,
+        })
+      );
+      
+      formData.append('arquivo', {
+        uri: arquivoSelecionado.uri,
+        name: arquivoSelecionado.name,
+        type: arquivoSelecionado.mimeType || 'application/octet-stream',
+      } as any);
 
       const response = await fetch(`${BASE_URL}/api/submissoes`, {
         method: 'POST',
-        headers: { Authorization: authHeader ?? '' },
+        headers: { 
+          'Authorization': authHeader ?? ''
+          // IMPORTANTE: NÃO enviamos Content-Type. O fetch vai criar o boundary do multipart automaticamente.
+        },
         body: formData,
       });
 
-      if (response.status === 200 || response.status === 201) {
+      if (response.ok) {
         Alert.alert('Sucesso', 'Atividade enviada com sucesso! Aguarde a avaliação do coordenador.');
         limparFormulario();
+        router.push('/dashboard/minhas-atividades'); // Redireciona para ver a atividade na lista!
         return;
       }
 
@@ -180,11 +185,11 @@ export default function AdicionarAtividade() {
         if (body?.erro) msg = body.erro;
         else if (body?.message) msg = body.message;
       } catch {
-        // Mantém a mensagem padrão quando a API não retorna JSON válido.
+        // Ignora caso não seja JSON
       }
-
-      Alert.alert('Erro', msg);
-    } catch {
+      Alert.alert('Falha', msg);
+    } catch (error) {
+      console.error(error);
       Alert.alert('Erro de conexão', 'Verifique sua internet e tente novamente.');
     } finally {
       setIsLoading(false);
