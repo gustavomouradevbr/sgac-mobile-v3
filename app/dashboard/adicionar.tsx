@@ -2,6 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system'; // <-- A biblioteca que vai salvar o dia
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -143,23 +144,33 @@ export default function AdicionarAtividade() {
       setIsLoading(true);
       const authHeader = await getAuthHeader();
 
+      // TRUQUE DE MESTRE: Transformar o JSON num ficheiro local para forçar 
+      // o React Native a enviá-lo com o formato 'application/json'
+      const payload = {
+        alunoId: Number(userId),
+        cursoId: cursoSelecionado,
+        titulo: tituloLimpo,
+        descricao: descricaoLimpa,
+        area: areaSelecionada,
+        cargaHoraria: horasNumero,
+        dataAtividade,
+      };
+
+      const jsonString = JSON.stringify(payload);
+      const jsonFileUri = FileSystem.cacheDirectory + 'dados.json';
+      await FileSystem.writeAsStringAsync(jsonFileUri, jsonString);
+
       const formData = new FormData();
-      formData.append(
-        'dados',
-        JSON.stringify({
-          alunoId: Number(userId),
-          cursoId: cursoSelecionado,
-          titulo: tituloLimpo,
-          descricao: descricaoLimpa,
-          area: areaSelecionada,
-          cargaHoraria: horasNumero,
-          dataAtividade,
-        })
-      );
+      
+      formData.append('dados', {
+        uri: jsonFileUri,
+        name: 'dados.json',
+        type: 'application/json'
+      } as any);
       
       formData.append('arquivo', {
         uri: arquivoSelecionado.uri,
-        name: arquivoSelecionado.name,
+        name: arquivoSelecionado.name || 'comprovante.jpg',
         type: arquivoSelecionado.mimeType || 'application/octet-stream',
       } as any);
 
@@ -167,30 +178,26 @@ export default function AdicionarAtividade() {
         method: 'POST',
         headers: { 
           'Authorization': authHeader ?? ''
-          // IMPORTANTE: NÃO enviamos Content-Type. O fetch vai criar o boundary do multipart automaticamente.
         },
         body: formData,
       });
 
       if (response.ok) {
-        Alert.alert('Sucesso', 'Atividade enviada com sucesso! Aguarde a avaliação do coordenador.');
+        Alert.alert('Sucesso', 'Atividade enviada com sucesso!');
         limparFormulario();
-        router.push('/dashboard/minhas-atividades'); // Redireciona para ver a atividade na lista!
+        router.push('/dashboard/minhas-atividades');
         return;
       }
 
-      let msg = 'Não foi possível enviar a atividade.';
+      let msg = `O Servidor recusou (Erro ${response.status}).`;
       try {
         const body = await response.json();
         if (body?.erro) msg = body.erro;
         else if (body?.message) msg = body.message;
-      } catch {
-        // Ignora caso não seja JSON
-      }
-      Alert.alert('Falha', msg);
+      } catch {}
+      Alert.alert('Falha no envio', msg);
     } catch (error) {
-      console.error(error);
-      Alert.alert('Erro de conexão', 'Verifique sua internet e tente novamente.');
+      Alert.alert('Erro de conexão', 'Verifique sua internet ou tente novamente mais tarde.');
     } finally {
       setIsLoading(false);
     }
