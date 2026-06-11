@@ -37,10 +37,16 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   return response.json() as Promise<T>;
 }
 
-export async function apiFetchMultipart<T>(path: string, formData: FormData): Promise<T> {
+export async function apiFetchMultipart<T>(
+  path: string,
+  formData: FormData
+): Promise<T> {
   const authHeader = await getAuthHeader();
+  
+  // A magia está aqui: criamos um objeto headers VAZIO
+  // O React Native vai automaticamente injetar o 'Content-Type: multipart/form-data; boundary=...'
   const headers: Record<string, string> = {};
-
+  
   if (authHeader) {
     headers['Authorization'] = authHeader;
   }
@@ -57,9 +63,7 @@ export async function apiFetchMultipart<T>(path: string, formData: FormData): Pr
       const body = await response.json();
       if (body?.erro) errorMsg = body.erro;
       else if (body?.message) errorMsg = body.message;
-    } catch {
-      // Mantém a mensagem padrão quando a resposta não é JSON.
-    }
+    } catch {}
     throw new Error(errorMsg);
   }
 

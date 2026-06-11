@@ -2,7 +2,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system'; // <-- A biblioteca que vai salvar o dia
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -16,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { apiFetch, BASE_URL, getAuthHeader } from '../../src/services/api';
+import { apiFetch, apiFetchMultipart } from '../../src/services/api';
 import type { Curso, RegraAtividade } from '../../src/services/types';
 
 const AREAS = [
@@ -142,11 +141,8 @@ export default function AdicionarAtividade() {
 
     try {
       setIsLoading(true);
-      const authHeader = await getAuthHeader();
 
-      // TRUQUE DE MESTRE: Transformar o JSON num ficheiro local para forçar 
-      // o React Native a enviá-lo com o formato 'application/json'
-      const payload = {
+      const dadosJson = JSON.stringify({
         alunoId: Number(userId),
         cursoId: cursoSelecionado,
         titulo: tituloLimpo,
@@ -154,19 +150,13 @@ export default function AdicionarAtividade() {
         area: areaSelecionada,
         cargaHoraria: horasNumero,
         dataAtividade,
-      };
+      });
 
-      const jsonString = JSON.stringify(payload);
-      const jsonFileUri = FileSystem.cacheDirectory + 'dados.json';
-      await FileSystem.writeAsStringAsync(jsonFileUri, jsonString);
-
-      const formData = new FormData();
+      // A Solução: Criamos o Blob aqui para forçar o React Native a enviá-lo como JSON
+      const jsonBlob = new Blob([dadosJson], { type: 'application/json' });
       
-      formData.append('dados', {
-        uri: jsonFileUri,
-        name: 'dados.json',
-        type: 'application/json'
-      } as any);
+      const formData = new FormData();
+      formData.append('dados', jsonBlob, 'dados.json');
       
       formData.append('arquivo', {
         uri: arquivoSelecionado.uri,
@@ -174,30 +164,14 @@ export default function AdicionarAtividade() {
         type: arquivoSelecionado.mimeType || 'application/octet-stream',
       } as any);
 
-      const response = await fetch(`${BASE_URL}/api/submissoes`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': authHeader ?? ''
-        },
-        body: formData,
-      });
+      await apiFetchMultipart('/api/submissoes', formData);
 
-      if (response.ok) {
-        Alert.alert('Sucesso', 'Atividade enviada com sucesso!');
-        limparFormulario();
-        router.push('/dashboard/minhas-atividades');
-        return;
-      }
+      Alert.alert('Sucesso', 'Atividade enviada com sucesso!');
+      limparFormulario();
+      router.push('/dashboard/minhas-atividades');
 
-      let msg = `O Servidor recusou (Erro ${response.status}).`;
-      try {
-        const body = await response.json();
-        if (body?.erro) msg = body.erro;
-        else if (body?.message) msg = body.message;
-      } catch {}
-      Alert.alert('Falha no envio', msg);
-    } catch (error) {
-      Alert.alert('Erro de conexão', 'Verifique sua internet ou tente novamente mais tarde.');
+    } catch (error: any) {
+      Alert.alert('Falha no envio', error.message || 'Verifique sua internet e tente novamente.');
     } finally {
       setIsLoading(false);
     }
