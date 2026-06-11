@@ -1,47 +1,28 @@
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { apiFetch } from '../../src/services/api';
+import type { SubmissaoResponse } from '../../src/services/types';
 
-import { AtividadeAluno, StatusAtividade, useAtividades } from './AtividadesContext';
-
-// Formata a data de 2026-06-02 para 02/06/2026
 function formatarData(dataISO: string) {
   const [ano, mes, dia] = dataISO.split('-');
-
-  if (!ano || !mes || !dia) {
-    return dataISO;
-  }
-
+  if (!ano || !mes || !dia) return dataISO;
   return `${dia}/${mes}/${ano}`;
 }
 
-// Define texto, ícone e cores de cada status
-function statusInfo(status: StatusAtividade) {
-  const infos = {
-    PENDENTE: {
-      label: 'Pendente',
-      icon: 'schedule' as const,
-      color: '#B87800',
-      bg: '#FFF1D8',
-    },
-    APROVADA: {
-      label: 'Aprovada',
-      icon: 'check-circle' as const,
-      color: '#1E8E4D',
-      bg: '#DDF6E8',
-    },
-    REPROVADA: {
-      label: 'Reprovada',
-      icon: 'cancel' as const,
-      color: '#B42318',
-      bg: '#FDE4E1',
-    },
-  };
-
-  return infos[status];
+function statusInfo(status: SubmissaoResponse['status']) {
+  switch (status) {
+    case 'APROVADA':
+      return { label: 'Aprovada', icon: 'check-circle' as const, color: '#1E8E4D', bg: '#DDF6E8' };
+    case 'REPROVADA':
+      return { label: 'Reprovada', icon: 'cancel' as const, color: '#B42318', bg: '#FDE4E1' };
+    default:
+      return { label: 'Pendente', icon: 'schedule' as const, color: '#B87800', bg: '#FFF1D8' };
+  }
 }
 
-// Card dos contadores
 function ContadorCard({ titulo, valor }: { titulo: string; valor: number }) {
   return (
     <View style={styles.counterCard}>
@@ -51,8 +32,7 @@ function ContadorCard({ titulo, valor }: { titulo: string; valor: number }) {
   );
 }
 
-// Card de uma atividade
-function AtividadeCard({ atividade }: { atividade: AtividadeAluno }) {
+function AtividadeCard({ atividade }: { atividade: SubmissaoResponse }) {
   const status = statusInfo(atividade.status);
 
   return (
@@ -60,14 +40,12 @@ function AtividadeCard({ atividade }: { atividade: AtividadeAluno }) {
       <View style={styles.cardHeader}>
         <View style={styles.cardTitleBlock}>
           <Text style={styles.activityTitle}>{atividade.titulo}</Text>
-          <Text style={styles.activitySubtitle}>{atividade.curso}</Text>
+          <Text style={styles.activitySubtitle}>{atividade.cursoNome}</Text>
         </View>
 
         <View style={[styles.statusPill, { backgroundColor: status.bg }]}>
           <MaterialIcons name={status.icon} size={15} color={status.color} />
-          <Text style={[styles.statusText, { color: status.color }]}>
-            {status.label}
-          </Text>
+          <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
         </View>
       </View>
 
@@ -84,20 +62,16 @@ function AtividadeCard({ atividade }: { atividade: AtividadeAluno }) {
 
         <View style={styles.infoItem}>
           <Text style={styles.infoLabel}>Data</Text>
-          <Text style={styles.infoValue}>
-            {formatarData(atividade.dataAtividade)}
-          </Text>
+          <Text style={styles.infoValue}>{formatarData(atividade.dataAtividade)}</Text>
         </View>
       </View>
 
-      {atividade.descricao ? (
-        <Text style={styles.description}>{atividade.descricao}</Text>
-      ) : null}
+      {atividade.descricao ? <Text style={styles.description}>{atividade.descricao}</Text> : null}
 
       <View style={styles.fileRow}>
         <MaterialIcons name="attach-file" size={17} color="#60748A" />
         <Text style={styles.fileName} numberOfLines={1} ellipsizeMode="middle">
-          {atividade.comprovanteNome}
+          {atividade.nomeArquivoComprovante ?? 'Comprovante enviado'}
         </Text>
       </View>
     </View>
@@ -106,24 +80,48 @@ function AtividadeCard({ atividade }: { atividade: AtividadeAluno }) {
 
 export default function MinhasAtividades() {
   const router = useRouter();
+  const [atividades, setAtividades] = useState<SubmissaoResponse[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Aqui pega as atividades que foram salvas no formulário
-  const { atividades } = useAtividades();
+  useEffect(() => {
+    loadAtividades();
+  }, []);
+
+  const loadAtividades = async () => {
+    try {
+      setLoading(true);
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) return;
+
+      const data = await apiFetch<SubmissaoResponse[]>(`/api/submissoes/aluno/${userId}`);
+      setAtividades(data);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível carregar seu histórico de atividades.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const pendentes = atividades.filter((atividade) => atividade.status === 'PENDENTE').length;
   const aprovadas = atividades.filter((atividade) => atividade.status === 'APROVADA').length;
   const reprovadas = atividades.filter((atividade) => atividade.status === 'REPROVADA').length;
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#004A8D" />
+        <Text style={styles.emptyText}>Carregando histórico...</Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <Stack.Screen options={{ title: 'Minhas Atividades' }} />
 
-      <View style={styles.pageHeader}>
-        <Text style={styles.kicker}>ATIVIDADES COMPLEMENTARES</Text>
+      <View style={styles.header}>
         <Text style={styles.title}>Minhas Atividades</Text>
-        <Text style={styles.subtitle}>
-          Acompanhe o histórico e o status das solicitações enviadas.
-        </Text>
+        <Text style={styles.subtitle}>Acompanhe o status dos seus envios</Text>
       </View>
 
       <View style={styles.countersGrid}>
@@ -138,199 +136,43 @@ export default function MinhasAtividades() {
       </Pressable>
 
       {atividades.length === 0 ? (
-        <View style={styles.emptyCard}>
+        <View style={styles.emptyContainer}>
           <MaterialIcons name="assignment" size={34} color="#004A8D" />
-          <Text style={styles.emptyTitle}>Nenhuma atividade cadastrada</Text>
-          <Text style={styles.emptyText}>
-            Quando você enviar uma solicitação, ela aparecerá aqui com status pendente.
-          </Text>
+          <Text style={styles.emptyText}>Nenhuma atividade submetida ainda.</Text>
         </View>
       ) : (
-        <View style={styles.activitiesList}>
-          {atividades.map((atividade) => (
-            <AtividadeCard key={atividade.id} atividade={atividade} />
-          ))}
-        </View>
+        atividades.map((item) => <AtividadeCard key={item.id} atividade={item} />)
       )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flexGrow: 1,
-    padding: 16,
-    paddingBottom: 28,
-    gap: 14,
-    backgroundColor: '#F3F7FB',
-  },
-  pageHeader: {
-    gap: 4,
-    paddingTop: 4,
-  },
-  kicker: {
-    color: '#F07C2B',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1.05,
-    textTransform: 'uppercase',
-  },
-  title: {
-    color: '#10233F',
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  subtitle: {
-    color: '#60748A',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  countersGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  counterCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E2EAF3',
-  },
-  counterTitle: {
-    color: '#60748A',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  counterValue: {
-    color: '#10233F',
-    fontSize: 22,
-    fontWeight: '900',
-    marginTop: 4,
-  },
-  addButton: {
-    backgroundColor: '#2F66F2',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  emptyCard: {
-    marginTop: 4,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 20,
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#E2EAF3',
-  },
-  emptyTitle: {
-    color: '#10233F',
-    fontSize: 17,
-    fontWeight: '900',
-    marginTop: 4,
-  },
-  emptyText: {
-    color: '#60748A',
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  activitiesList: {
-    gap: 12,
-  },
-  activityCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#E2EAF3',
-    shadowColor: '#10345F',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  cardTitleBlock: {
-    flex: 1,
-    gap: 4,
-  },
-  activityTitle: {
-    color: '#10233F',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  activitySubtitle: {
-    color: '#60748A',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  statusPill: {
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  infoGrid: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  infoItem: {
-    flex: 1,
-    backgroundColor: '#F5F8FC',
-    borderRadius: 12,
-    padding: 10,
-  },
-  infoLabel: {
-    color: '#708299',
-    fontSize: 10,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  infoValue: {
-    color: '#10233F',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  description: {
-    color: '#455B73',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  fileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#EEF3F8',
-    paddingTop: 10,
-  },
-  fileName: {
-    flex: 1,
-    color: '#60748A',
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  container: { flexGrow: 1, padding: 20, gap: 14, backgroundColor: '#F3F7FB' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F7FB' },
+  header: { marginBottom: 4 },
+  title: { fontSize: 24, fontWeight: '800', color: '#10233F' },
+  subtitle: { fontSize: 14, color: '#60748A', marginTop: 4 },
+  countersGrid: { flexDirection: 'row', gap: 10 },
+  counterCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#E4ECF6' },
+  counterTitle: { color: '#60748A', fontSize: 11, fontWeight: '800' },
+  counterValue: { color: '#10233F', fontSize: 22, fontWeight: '900', marginTop: 4 },
+  addButton: { backgroundColor: '#2F66F2', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  addButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  emptyContainer: { alignItems: 'center', marginTop: 60, gap: 12 },
+  emptyText: { color: '#60748A', fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  activityCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E4ECF6' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 12 },
+  cardTitleBlock: { flex: 1 },
+  activityTitle: { fontSize: 16, fontWeight: '700', color: '#153150' },
+  activitySubtitle: { fontSize: 12, color: '#60748A', marginTop: 2, fontWeight: '700' },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statusText: { fontSize: 11, fontWeight: '800', color: '#FFFFFF' },
+  infoGrid: { flexDirection: 'row', gap: 8 },
+  infoItem: { flex: 1, backgroundColor: '#F5F8FC', borderRadius: 12, padding: 10 },
+  infoLabel: { color: '#708299', fontSize: 10, fontWeight: '800', marginBottom: 4 },
+  infoValue: { color: '#10233F', fontSize: 12, fontWeight: '900' },
+  description: { color: '#455B73', fontSize: 13, lineHeight: 19, marginTop: 12 },
+  fileRow: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  fileName: { flex: 1, color: '#60748A', fontSize: 12, fontWeight: '600' },
 });

@@ -1,6 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, usePathname, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Image,
     Modal,
@@ -126,6 +127,11 @@ type NavListProps = {
 };
 function Sidebar({ variant, pathname, onNavigate, onLogout }: SidebarProps) {
   const isMobile = variant === 'mobile';
+  const [nomeUsuario, setNomeUsuario] = useState('Aluno');
+
+  useEffect(() => {
+    AsyncStorage.getItem('userName').then(nome => setNomeUsuario(nome || 'Aluno'));
+  }, []);
 
   return (
     <View style={[styles.sidebarBase, isMobile ? styles.mobileSidebar : styles.desktopSidebar]}>
@@ -157,7 +163,7 @@ function Sidebar({ variant, pathname, onNavigate, onLogout }: SidebarProps) {
           <View style={styles.mobileFooter}>
             <View style={styles.mobileUserCard}>
               <MaterialIcons name="person" size={18} color="#004A8D" />
-              <Text style={styles.mobileUserText}>Ana Beatriz Santos</Text>
+              <Text style={styles.mobileUserText}>{nomeUsuario}</Text>
             </View>
             <Pressable onPress={onLogout} style={styles.mobileLogoutButton}>
               <Text style={styles.mobileLogoutText}>Sair</Text>
@@ -170,7 +176,7 @@ function Sidebar({ variant, pathname, onNavigate, onLogout }: SidebarProps) {
           <View style={styles.desktopFooter}>
             <View style={styles.desktopUserChip}>
               <MaterialIcons name="person" size={14} color="#004A8D" />
-              <Text style={styles.desktopUserText}>Ana Beatriz Santos</Text>
+              <Text style={styles.desktopUserText}>{nomeUsuario}</Text>
             </View>
             <Pressable onPress={onLogout} style={styles.desktopLogoutButton}>
               <MaterialIcons name="logout" size={14} color="#FFFFFF" />
