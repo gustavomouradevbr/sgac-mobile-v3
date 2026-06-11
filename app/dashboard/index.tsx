@@ -7,18 +7,18 @@ import { useCurso } from './CursoContext';
 import { FiltroCurso } from './FiltroCurso';
 
 type DashboardData = {
-  totalHoras?: number;
-  horasAprovadas?: number;
-  horasPendentes?: number;
-  horasReprovadas?: number;
-  progressoGeral?: number;
+  totalHorasSubmetidas?: number;
+  totalHorasAprovadas?: number;
+  totalHorasPendentes?: number;
+  totalHorasReprovadas?: number;
+  percentualConclusao?: number;
 };
 
 export default function DashboardHome() {
   const { cursoAtivo, setCursoAtivo } = useCurso();
-  const [userName, setUserName] = useState('');
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [nome, setNome] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [metrics, setMetrics] = useState<DashboardData>({});
 
   useEffect(() => {
     let isMounted = true;
@@ -35,10 +35,10 @@ export default function DashboardHome() {
           return;
         }
 
-        setUserName(storedUserName ?? '');
+        setNome(storedUserName ?? '');
 
         if (!storedUserId || !storedAuthHeader) {
-          setDashboardData(null);
+          setMetrics({});
           return;
         }
 
@@ -55,18 +55,18 @@ export default function DashboardHome() {
 
         if (response.status === 200) {
           const data: DashboardData = await response.json();
-          setDashboardData(data);
+          setMetrics(data);
         } else {
-          setDashboardData(null);
+          setMetrics({});
         }
       } catch (error) {
         console.error('Erro ao carregar o painel:', error);
         if (isMounted) {
-          setDashboardData(null);
+          setMetrics({});
         }
       } finally {
         if (isMounted) {
-          setIsLoading(false);
+          setLoading(false);
         }
       }
     };
@@ -78,9 +78,9 @@ export default function DashboardHome() {
     };
   }, []);
 
-  const displayName = userName.trim() ? userName : 'Aluno';
+  const displayName = nome.trim() ? nome : 'Aluno';
 
-  if (isLoading) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#004A8D" />
@@ -89,11 +89,11 @@ export default function DashboardHome() {
     );
   }
 
-  const totalHoras = dashboardData?.totalHoras ?? 0;
-  const horasAprovadas = dashboardData?.horasAprovadas ?? 0;
-  const horasPendentes = dashboardData?.horasPendentes ?? 0;
-  const horasReprovadas = dashboardData?.horasReprovadas ?? 0;
-  const progressoGeral = dashboardData?.progressoGeral ?? 0;
+  const horasEnviadas = metrics.totalHorasSubmetidas || 0;
+  const horasAprovadas = metrics.totalHorasAprovadas || 0;
+  const horasPendentes = metrics.totalHorasPendentes || 0;
+  const horasReprovadas = metrics.totalHorasReprovadas || 0;
+  const progressoGeral = metrics.percentualConclusao || 0;
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -119,8 +119,8 @@ export default function DashboardHome() {
 
       <View style={styles.metricsGrid}>
         <MetricCard 
-          title="Total de Atividades" 
-          value={String(totalHoras ?? 0)} 
+          title="Horas Enviadas" 
+          value={String(horasEnviadas || 0)} 
           icon="emoji-events" 
           iconColor="#5B8DEF" 
           accentColor="#D7E5FF" 
@@ -163,7 +163,7 @@ export default function DashboardHome() {
         <ProgressBar progressPercent={progressoGeral ?? 0} color="#3A76D3" trackColor="#D6DAE3" height={8} />
 
         <Text style={styles.sectionLegend}>
-          {totalHoras ?? 0}h concluídas de 200h. Faltam {200 - (totalHoras ?? 0)}h.
+          {horasAprovadas || 0}h aprovadas de 200h. Faltam {Math.max(200 - (horasAprovadas || 0), 0)}h.
         </Text>
       </View>
 

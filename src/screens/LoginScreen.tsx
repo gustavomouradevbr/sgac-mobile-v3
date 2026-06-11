@@ -16,11 +16,24 @@ import {
   View,
 } from 'react-native';
 
-const buildBasicAuthHeader = (email: string, password: string) => {
-  const credentials = `${email}:${password}`;
-  const encodedCredentials = globalThis.btoa(credentials);
+const encodeBase64 = (input: string) => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  let str = input;
+  let output = '';
 
-  return `Basic ${encodedCredentials}`;
+  for (
+    let block = 0, charCode: number, i = 0, map = chars;
+    str.charAt(i | 0) || ((map = '='), i % 1);
+    output += map.charAt((63 & (block >> (8 - (i % 1) * 8))))
+  ) {
+    charCode = str.charCodeAt((i += 3 / 4));
+    if (charCode > 0xff) {
+      throw new Error('encodeBase64 suporta apenas caracteres Latin1.');
+    }
+    block = (block << 8) | charCode;
+  }
+
+  return output;
 };
 
 export default function LoginScreen() {
@@ -30,10 +43,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
-    const sanitizedEmail = email.trim();
-    const sanitizedPassword = password.trim();
-
-    if (!sanitizedEmail || !sanitizedPassword) {
+    if (!email.trim() || !password.trim()) {
       Alert.alert('Atenção', 'Informe o e-mail e a senha para continuar.');
       return;
     }
@@ -55,21 +65,17 @@ export default function LoginScreen() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email: sanitizedEmail,
-          senha: sanitizedPassword,
-          perfil: 'ALUNO' 
-        }),
+        body: JSON.stringify({ email: email.trim(), senha: password.trim(), perfil: 'ALUNO' }),
         signal: controller.signal,
       });
 
       if (response.status === 200) {
         const data = await response.json();
-        const authHeader = buildBasicAuthHeader(sanitizedEmail, sanitizedPassword);
+        const basicAuth = 'Basic ' + encodeBase64(email.trim() + ':' + password.trim());
 
-        await AsyncStorage.setItem('authHeader', authHeader);
-        await AsyncStorage.setItem('userId', String(data.id ?? ''));
-        await AsyncStorage.setItem('userName', String(data.nome ?? ''));
+        await AsyncStorage.setItem('authHeader', basicAuth);
+        await AsyncStorage.setItem('userId', String(data.id));
+        await AsyncStorage.setItem('userName', data.nome);
 
         router.push('/dashboard');
         return;
