@@ -1,24 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
-import * as DocumentPicker from 'expo-document-picker';
-import { Stack } from 'expo-router';
-import { useState } from 'react';
-import {
-    ActivityIndicator,
-    Alert,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -397,4 +379,3 @@ const styles = StyleSheet.create({
   studentEmail: { color: '#4B6A92', fontSize: 13, fontWeight: '600' },
   footer: { color: '#5E7188', fontSize: 12, lineHeight: 18, textAlign: 'center', paddingTop: 6 },
 });
-    paddingHorizontal: 12,
