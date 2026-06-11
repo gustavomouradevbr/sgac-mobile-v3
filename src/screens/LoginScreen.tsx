@@ -1,6 +1,5 @@
-// Hooks e APIs React/Expo usados na tela
-// Não usar expo-linear-gradient para evitar dependência externa
-import { useRouter } from 'expo-router'; // Router do Expo para navegação entre telas
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,65 +13,102 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
 } from 'react-native';
 
 export default function LoginScreen() {
   const router = useRouter();
-
-  // Estados locais para os campos do formulário
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Função chamada ao pressionar o botão Entrar
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Atenção', 'Por favor, preencha todos os campos.');
+    const sanitizedEmail = email.trim();
+    const sanitizedPassword = password.trim();
+
+    if (!sanitizedEmail || !sanitizedPassword) {
+      Alert.alert('Atenção', 'Informe o e-mail e a senha para continuar.');
       return;
     }
+
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     try {
       setIsLoading(true);
 
-      const response = await fetch('https://api-sgac-gustavo.onrender.com/api/auth/login', {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 60000);
+
+      console.log('Iniciando requisição para o Render...');
+
+      const response = await fetch('https://api-sgac-gustavo.onrender.com/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: email,
-          senha: password,
+          email: sanitizedEmail,
+          senha: sanitizedPassword,
+          perfil: 'ALUNO' 
         }),
+        signal: controller.signal,
       });
 
       if (response.status === 200) {
         const data = await response.json();
-        console.log('Login efetuado com sucesso:', data);
+
+        await AsyncStorage.setItem('userToken', String(data.token ?? ''));
+        await AsyncStorage.setItem('userId', String(data.usuarioId ?? ''));
+        await AsyncStorage.setItem('userName', String(data.userName ?? data.nome ?? ''));
+
         router.push('/dashboard');
         return;
       }
 
-      Alert.alert('Falha no Login', 'E-mail ou senha incorretos.');
-    } catch (error) {
-      console.error(error);
-      Alert.alert('Erro de Conexão', 'Não foi possível conectar ao servidor do Render.');
+      let errorMessage = 'Não foi possível autenticar. Verifique seus dados e tente novamente.';
+
+      try {
+        const errorBody = await response.json();
+        if (typeof errorBody?.message === 'string' && errorBody.message.trim()) {
+          errorMessage = errorBody.message;
+        }
+      } catch {
+        // Mantém a mensagem padrão quando a API não retorna JSON válido.
+      }
+
+      Alert.alert('Falha no login', errorMessage);
+    } catch (error: unknown) {
+      const isAbortError = error instanceof Error && error.name === 'AbortError';
+
+      if (isAbortError) {
+        Alert.alert(
+          'Tempo esgotado',
+          'A requisição demorou mais de 60 segundos e foi cancelada. Tente novamente.'
+        );
+      } else {
+        Alert.alert(
+          'Erro de conexão',
+          'Não foi possível conectar à API do Render. Verifique a internet e tente novamente.'
+        );
+      }
+
+      console.error('Erro ao tentar fazer login:', error);
     } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       setIsLoading(false);
     }
   };
 
   return (
-    // Fundo sólido aproximando o gradiente da imagem (sem dependências extras)
     <View style={styles.gradient}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.flex}
-        >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <View style={styles.card}>
-              {/* Área do logotipo */}
               <View style={styles.logoWrap}>
                 <Image
                   source={require('../../assets/senac/senac-logo.png')}
@@ -82,14 +118,12 @@ export default function LoginScreen() {
                 />
               </View>
 
-              {/* Títulos e descrição */}
               <Text style={styles.kicker}>SGAC - Portal do Aluno</Text>
-              <Text style={styles.title}>Acesse sua área institucional</Text>
+              <Text style={styles.title}>Acesse à sua área institucional</Text>
               <Text style={styles.subtitle}>
                 Entre com suas credenciais para consultar informações acadêmicas e serviços do portal.
               </Text>
 
-              {/* Formulário de login */}
               <View style={styles.form}>
                 <View style={styles.field}>
                   <Text style={styles.label}>E-mail institucional</Text>
@@ -103,6 +137,7 @@ export default function LoginScreen() {
                     autoCorrect={false}
                     style={styles.input}
                     textContentType="username"
+                    editable={!isLoading}
                   />
                 </View>
 
@@ -111,23 +146,19 @@ export default function LoginScreen() {
                   <TextInput
                     value={password}
                     onChangeText={setPassword}
-                    placeholder="Digite sua senha"
+                    placeholder="Digite a sua senha"
                     placeholderTextColor="#8CA0B7"
                     secureTextEntry
                     autoCapitalize="none"
                     autoCorrect={false}
                     style={styles.input}
                     textContentType="password"
+                    editable={!isLoading}
                   />
                 </View>
 
-                {/* Botão de submissão (chama handleLogin) */}
-                <Pressable style={styles.button} onPress={handleLogin} disabled={isLoading}>
-                  {isLoading ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.buttonText}>Entrar</Text>
-                  )}
+                <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
+                  {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Entrar</Text>}
                 </Pressable>
               </View>
             </View>
@@ -139,18 +170,9 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  flex: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-  },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
+  flex: { flex: 1 },
+  content: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 28,
@@ -161,14 +183,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 12 },
     elevation: 8,
   },
-  logoWrap: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  logo: {
-    width: 160,
-    height: 72,
-  },
+  logoWrap: { alignItems: 'center', marginBottom: 20 },
+  logo: { width: 160, height: 72 },
   kicker: {
     color: '#004A8D',
     fontSize: 13,
@@ -177,30 +193,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 8,
   },
-  title: {
-    color: '#10233F',
-    fontSize: 28,
-    fontWeight: '800',
-    lineHeight: 34,
-  },
-  subtitle: {
-    color: '#60748A',
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 12,
-  },
-  form: {
-    marginTop: 28,
-    gap: 16,
-  },
-  field: {
-    gap: 8,
-  },
-  label: {
-    color: '#153150',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  title: { color: '#10233F', fontSize: 28, fontWeight: '800', lineHeight: 34 },
+  subtitle: { color: '#60748A', fontSize: 15, lineHeight: 22, marginTop: 12 },
+  form: { marginTop: 28, gap: 16 },
+  field: { gap: 8 },
+  label: { color: '#153150', fontSize: 14, fontWeight: '600' },
   input: {
     borderWidth: 1,
     borderColor: '#D8E2EE',
@@ -218,14 +215,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 15,
     marginTop: 4,
+    minHeight: 52,
   },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  gradient: {
-    flex: 1,
-    backgroundColor: '#2E7D9A', // cor sólida aproximada ao gradiente desejado
-  },
+  buttonDisabled: { opacity: 0.75 },
+  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  gradient: { flex: 1, backgroundColor: '#2E7D9A' },
 });
