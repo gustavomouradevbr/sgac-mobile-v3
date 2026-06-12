@@ -15,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { apiFetch, BASE_URL, getAuthHeader } from '../../src/services/api';
+import { apiFetch, BASE_URL, getAuthHeader, uploadAtividadeMultipart } from '../../src/services/api';
 import type { Curso, RegraAtividade } from '../../src/services/types';
 
 const AREAS = [
@@ -144,61 +144,28 @@ export default function AdicionarAtividade() {
 
     try {
       setIsLoading(true);
-      const authHeader = await getAuthHeader();
 
-      const dadosObj = {
-        alunoId: Number(userId),
-        cursoId: cursoSelecionado,
-        titulo: tituloLimpo,
-        descricao: descricaoLimpa,
-        area: areaSelecionada,
-        cargaHoraria: horasNumero,
+      // Usa a engine nativa do Expo para fazer o upload seguro
+      const response = await uploadAtividadeMultipart(
+        userId,
+        cursoSelecionado,
+        tituloLimpo,
+        descricaoLimpa,
+        areaSelecionada,
+        horasNumero,
         dataAtividade,
-      };
+        arquivoSelecionado.uri,
+        arquivoSelecionado.name || 'comprovante.jpg',
+        arquivoSelecionado.mimeType || 'application/octet-stream'
+      );
 
-      const formData = new FormData();
+      Alert.alert('Sucesso', 'Atividade enviada com sucesso!');
+      limparFormulario();
+      router.push('/dashboard/minhas-atividades');
 
-      // RN Moderno (Expo SDK 54): Utilizamos um Blob nativo para JSON.
-      const dadosBlob = new Blob([JSON.stringify(dadosObj)], { type: 'application/json' });
-      formData.append('dados', dadosBlob);
-      
-      // Correção vital de URI para dispositivos Android
-      let fileUri = arquivoSelecionado.uri;
-      if (Platform.OS === 'android' && !fileUri.startsWith('file://') && !fileUri.startsWith('content://')) {
-        fileUri = `file://${fileUri}`;
-      }
-
-      formData.append('arquivo', {
-        uri: fileUri,
-        name: arquivoSelecionado.name || 'comprovante.jpg',
-        type: arquivoSelecionado.mimeType || 'application/octet-stream',
-      } as any);
-
-      const response = await fetch(`${BASE_URL}/api/submissoes`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': authHeader ?? '',
-          'Accept': 'application/json'
-        },
-        body: formData,
-      });
-
-      if (response.ok) {
-        Alert.alert('Sucesso', 'Atividade enviada com sucesso!');
-        limparFormulario();
-        router.push('/dashboard/minhas-atividades');
-        return;
-      }
-
-      let msg = `O Servidor recusou (Erro ${response.status}).`;
-      try {
-        const body = await response.json();
-        if (body?.erro) msg = body.erro;
-        else if (body?.message) msg = body.message;
-      } catch {}
-      Alert.alert('Falha no envio', msg);
     } catch (error: any) {
-      Alert.alert('Erro de conexão', error.message || 'Verifique sua internet ou tente novamente mais tarde.');
+      console.error(error);
+      Alert.alert('Falha no envio', error.message || 'Verifique sua internet ou tente novamente mais tarde.');
     } finally {
       setIsLoading(false);
     }
