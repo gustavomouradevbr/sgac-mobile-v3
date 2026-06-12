@@ -2,7 +2,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -16,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { BASE_URL, getAuthHeader } from '../../src/services/api';
+import { apiFetch, BASE_URL, getAuthHeader } from '../../src/services/api';
 import type { Curso, RegraAtividade } from '../../src/services/types';
 
 const AREAS = [
@@ -43,46 +42,31 @@ export default function AdicionarAtividade() {
   const [mostrarCalendario, setMostrarCalendario] = useState(false);
   const [arquivoSelecionado, setArquivoSelecionado] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
-  const [userName, setUserName] = useState('');
 
   useEffect(() => {
+    AsyncStorage.getItem('userName').then(n => setUserEmail(n ?? ''));
     AsyncStorage.getItem('userId').then(id => setUserId(id));
-    AsyncStorage.getItem('userName').then(n => setUserName(n ?? ''));
 
-    carregarCursos();
+    apiFetch<Curso[]>('/api/cursos')
+      .then(data => {
+        // Proteção estrita: garante que só atribui um Array válido
+        const cursosSeguros = Array.isArray(data) ? data : [];
+        setCursos(cursosSeguros);
+        if (cursosSeguros.length > 0) {
+          setCursoSelecionado(cursosSeguros[0].id);
+          loadRegras(cursosSeguros[0].id);
+        }
+      })
+      .catch(() => Alert.alert('Aviso', 'Não foi possível carregar os cursos.'));
   }, []);
 
-  const carregarCursos = async () => {
+  const loadRegras = async (cursoId: number) => {
     try {
-      const authHeader = await getAuthHeader();
-      const response = await fetch(`${BASE_URL}/api/cursos`, {
-        headers: {
-          'Authorization': authHeader ?? '',
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) throw new Error('Falha ao buscar cursos');
-      const data: Curso[] = await response.json();
-      setCursos(data);
-      if (data.length > 0) {
-        setCursoSelecionado(data[0].id);
-        carregarRegras(data[0].id);
-      }
-    } catch {
-      Alert.alert('Aviso', 'Não foi possível carregar os cursos.');
-    }
-  };
-
-  const carregarRegras = async (cursoId: number) => {
-    try {
-      const authHeader = await getAuthHeader();
-      const response = await fetch(`${BASE_URL}/api/regras/curso/${cursoId}`, {
-        headers: { 'Authorization': authHeader ?? '' },
-      });
-      if (!response.ok) throw new Error();
-      const data: RegraAtividade[] = await response.json();
-      setRegras(data);
+      const data = await apiFetch<RegraAtividade[]>(`/api/regras/curso/${cursoId}`);
+      // Proteção estrita para as regras
+      setRegras(Array.isArray(data) ? data : []);
     } catch {
       setRegras([]);
     }
@@ -158,15 +142,10 @@ export default function AdicionarAtividade() {
       return;
     }
 
-    let jsonTempUri: string | null = null;
-
     try {
       setIsLoading(true);
-
       const authHeader = await getAuthHeader();
 
-      // Cria um arquivo JSON temporário — única forma confiável no React Native
-      // para enviar um multipart/form-data com Content-Type: application/json num part
       const dadosObj = {
         alunoId: Number(userId),
         cursoId: cursoSelecionado,
@@ -177,57 +156,50 @@ export default function AdicionarAtividade() {
         dataAtividade,
       };
 
-      jsonTempUri = `${FileSystem.cacheDirectory}submissao_${Date.now()}.json`;
-      await FileSystem.writeAsStringAsync(jsonTempUri, JSON.stringify(dadosObj), {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
-
       const formData = new FormData();
 
-      // Part "dados" como arquivo JSON com Content-Type correto
-      formData.append('dados', {
-        uri: jsonTempUri,
-        name: 'dados.json',
-        type: 'application/json',
-      } as any);
+      // RN Moderno (Expo SDK 54): Utilizamos um Blob nativo para JSON.
+      const dadosBlob = new Blob([JSON.stringify(dadosObj)], { type: 'application/json' });
+      formData.append('dados', dadosBlob);
+      
+      // Correção vital de URI para dispositivos Android
+      let fileUri = arquivoSelecionado.uri;
+      if (Platform.OS === 'android' && !fileUri.startsWith('file://') && !fileUri.startsWith('content://')) {
+        fileUri = `file://${fileUri}`;
+      }
 
-      // Part "arquivo" com o comprovante
       formData.append('arquivo', {
-        uri: arquivoSelecionado.uri,
+        uri: fileUri,
         name: arquivoSelecionado.name || 'comprovante.jpg',
         type: arquivoSelecionado.mimeType || 'application/octet-stream',
       } as any);
 
       const response = await fetch(`${BASE_URL}/api/submissoes`, {
         method: 'POST',
-        headers: {
-          // NÃO definir Content-Type aqui — o React Native injeta o multipart boundary automaticamente
+        headers: { 
           'Authorization': authHeader ?? '',
+          'Accept': 'application/json'
         },
         body: formData,
       });
 
-      if (!response.ok) {
-        let errorMsg = `Erro ${response.status}`;
-        try {
-          const body = await response.json();
-          if (body?.erro) errorMsg = body.erro;
-          else if (body?.message) errorMsg = body.message;
-        } catch { /* mantém mensagem padrão */ }
-        throw new Error(errorMsg);
+      if (response.ok) {
+        Alert.alert('Sucesso', 'Atividade enviada com sucesso!');
+        limparFormulario();
+        router.push('/dashboard/minhas-atividades');
+        return;
       }
 
-      Alert.alert('Sucesso', 'Atividade enviada com sucesso!');
-      limparFormulario();
-      router.push('/dashboard/minhas-atividades');
-
+      let msg = `O Servidor recusou (Erro ${response.status}).`;
+      try {
+        const body = await response.json();
+        if (body?.erro) msg = body.erro;
+        else if (body?.message) msg = body.message;
+      } catch {}
+      Alert.alert('Falha no envio', msg);
     } catch (error: any) {
-      Alert.alert('Falha no envio', error.message || 'Verifique sua internet e tente novamente.');
+      Alert.alert('Erro de conexão', error.message || 'Verifique sua internet ou tente novamente mais tarde.');
     } finally {
-      // Limpa o arquivo temporário
-      if (jsonTempUri) {
-        FileSystem.deleteAsync(jsonTempUri, { idempotent: true }).catch(() => {});
-      }
       setIsLoading(false);
     }
   }
@@ -257,7 +229,7 @@ export default function AdicionarAtividade() {
                   style={[styles.chip, cursoSelecionado === c.id && styles.chipActive]}
                   onPress={() => {
                     setCursoSelecionado(c.id);
-                    carregarRegras(c.id);
+                    loadRegras(c.id);
                   }}
                 >
                   <Text style={[styles.chipText, cursoSelecionado === c.id && styles.chipTextActive]}>
@@ -284,9 +256,7 @@ export default function AdicionarAtividade() {
               </Pressable>
             ))}
           </View>
-          {limiteHorasArea !== null && (
-            <Text style={styles.limiteHint}>Limite para esta área: {limiteHorasArea}h</Text>
-          )}
+          {limiteHorasArea !== null && <Text style={styles.limiteHint}>Limite para esta área: {limiteHorasArea}h</Text>}
         </View>
 
         <View style={styles.inputGroup}>
@@ -365,9 +335,7 @@ export default function AdicionarAtividade() {
             onPress={enviarAtividade}
             disabled={isLoading}
           >
-            {isLoading
-              ? <ActivityIndicator color="#FFFFFF" />
-              : <Text style={styles.submitButtonText}>Enviar Solicitação</Text>}
+            {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitButtonText}>Enviar Solicitação</Text>}
           </Pressable>
         </View>
       </View>
@@ -378,7 +346,7 @@ export default function AdicionarAtividade() {
         </View>
         <View style={styles.studentTextBlock}>
           <Text style={styles.studentTitle}>Aluno</Text>
-          <Text style={styles.studentEmail}>{userName || 'Carregando...'}</Text>
+          <Text style={styles.studentEmail}>{userEmail || 'Carregando...'}</Text>
         </View>
       </View>
 
