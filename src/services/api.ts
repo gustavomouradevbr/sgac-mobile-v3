@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
 export const BASE_URL = 'https://api-sgac-gustavo.onrender.com';
@@ -56,43 +56,63 @@ export async function uploadAtividadeMultipart(
 
   // Corrige a URI do ficheiro para o Android
   let uploadUri = fileUri;
-  if (Platform.OS === 'android' && !uploadUri.startsWith('file://')) {
+  if (Platform.OS === 'android' && !uploadUri.startsWith('file://') && !uploadUri.startsWith('content://')) {
     uploadUri = `file://${uploadUri}`;
   }
 
-  // Prepara o objeto JSON que o Spring Boot exige
-  const dados = JSON.stringify({
+  // Prepara o objeto JSON mapeando o nome das variáveis como o Spring Boot espera
+  const dadosObj = {
     alunoId: Number(alunoId),
     cursoId,
     titulo,
     descricao,
     area,
-    cargaHoraria,
+    cargaHoraria, // <-- Voltamos para 'cargaHoraria', pois é o que o DTO do Spring Boot realmente exige no JSON
     dataAtividade,
-  });
+  };
+
+  // RN Bug Fix: Misturar Blob (memória) e URIs (disco) no mesmo FormData
+  // causa "Network request failed" no Android. A solução é salvar o JSON no disco temporariamente.
+  const jsonUri = FileSystem.cacheDirectory + 'dados.json';
+  await FileSystem.writeAsStringAsync(jsonUri, JSON.stringify(dadosObj));
+  
+  let jsonUploadUri = jsonUri;
+  if (Platform.OS === 'android' && !jsonUploadUri.startsWith('file://')) {
+    jsonUploadUri = `file://${jsonUploadUri}`;
+  }
+
+  const formData = new FormData();
+
+  formData.append('dados', {
+    uri: jsonUploadUri,
+    name: 'dados.json',
+    type: 'application/json'
+  } as any);
+
+  formData.append('arquivo', {
+    uri: uploadUri,
+    name: fileName,
+    type: mimeType,
+  } as any);
 
   try {
-    // Usamos a função nativa de upload do Expo File System
-    const uploadTask = await FileSystem.uploadAsync(url, uploadUri, {
-      httpMethod: 'POST',
-      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-      fieldName: 'arquivo', // O nome do ficheiro (MultipartFile arquivo) no Spring Boot
-      mimeType: mimeType,
+    // Voltamos ao fetch nativo. No Expo SDK moderno, ele não falha a rede se a URI estiver correta.
+    const response = await fetch(url, {
+      method: 'POST',
       headers: {
-        Authorization: authHeader || '',
+        'Authorization': authHeader ?? '',
+        'Accept': 'application/json',
+        // ATENÇÃO: Nunca defina manualmente o 'Content-Type': 'multipart/form-data' no fetch do RN
       },
-      parameters: {
-        // Envia o JSON como um campo de texto no formulário (o Spring Boot com @RequestPart aceita isto se o conversor JSON estiver bem configurado)
-        dados: dados,
-      },
+      body: formData,
     });
 
-    if (uploadTask.status === 200 || uploadTask.status === 201) {
-      return JSON.parse(uploadTask.body);
+    if (response.ok) {
+      return await response.json();
     } else {
-      let msg = `O Servidor recusou (Erro ${uploadTask.status}).`;
+      let msg = `O Servidor recusou (Erro ${response.status}).`;
       try {
-        const body = JSON.parse(uploadTask.body);
+        const body = await response.json();
         if (body?.erro) msg = body.erro;
         else if (body?.message) msg = body.message;
       } catch {}
