@@ -5,11 +5,8 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiFetch } from '../../src/services/api';
 import type { AlunoProgressoDTO } from '../../src/services/types';
-import { useCurso } from './CursoContext';
-import { FiltroCurso } from './FiltroCurso';
 
 export default function DashboardHome() {
-  const { cursoAtivo, setCursoAtivo } = useCurso();
   const [userName, setUserName] = useState('');
   const [dashboardData, setDashboardData] = useState<AlunoProgressoDTO | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,8 +90,6 @@ export default function DashboardHome() {
         <Text style={styles.title}>Painel Inicial</Text>
         <Text style={styles.subtitle}>Acompanhe seus dados principais e acesse rapidamente as ações mais usadas.</Text>
       </View>
-
-      <FiltroCurso cursoSelecionado={cursoAtivo} onSelecionarCurso={setCursoAtivo} />
 
       <View style={styles.heroCard}>
         <View style={styles.heroIconWrap}>
