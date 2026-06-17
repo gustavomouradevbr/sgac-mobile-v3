@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiFetch } from '../../src/services/api';
 import type { SubmissaoResponse } from '../../src/services/types';
+type FiltroStatus = 'TODOS' | 'PENDENTE' | 'APROVADA' | 'REPROVADA';
 
 function formatarData(dataISO: string) {
   const [ano, mes, dia] = dataISO.split('-');
@@ -82,6 +83,7 @@ export default function MinhasAtividades() {
   const router = useRouter();
   const [atividades, setAtividades] = useState<SubmissaoResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filtro, setFiltro] = useState<FiltroStatus>('TODOS');
 
   useEffect(() => {
     loadAtividades();
@@ -105,6 +107,9 @@ export default function MinhasAtividades() {
   const pendentes = atividades.filter((atividade) => atividade.status === 'PENDENTE').length;
   const aprovadas = atividades.filter((atividade) => atividade.status === 'APROVADA').length;
   const reprovadas = atividades.filter((atividade) => atividade.status === 'REPROVADA').length;
+  const atividadesFiltradas = filtro === 'TODOS'
+    ? atividades
+    : atividades.filter(a => a.status === filtro);
 
   if (loading) {
     return (
@@ -135,13 +140,28 @@ export default function MinhasAtividades() {
         <Text style={styles.addButtonText}>Adicionar nova atividade</Text>
       </Pressable>
 
-      {atividades.length === 0 ? (
+      <View style={styles.filtrosRow}>
+        {(['TODOS','PENDENTE','APROVADA','REPROVADA'] as FiltroStatus[]).map(f => (
+          <Pressable
+            key={f}
+            onPress={() => setFiltro(f)}
+            style={[styles.filtroChip, filtro === f && styles.filtroChipAtivo]}
+          >
+            <Text style={[styles.filtroTexto, filtro === f && styles.filtroTextoAtivo]}>
+              {f === 'TODOS' ? 'Todos' : f === 'PENDENTE' ? 'Pendentes'
+               : f === 'APROVADA' ? 'Aprovadas' : 'Reprovadas'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {atividadesFiltradas.length === 0 ? (
         <View style={styles.emptyContainer}>
           <MaterialIcons name="assignment" size={34} color="#004A8D" />
-          <Text style={styles.emptyText}>Nenhuma atividade submetida ainda.</Text>
+          <Text style={styles.emptyText}>{atividades.length === 0 ? 'Nenhuma atividade submetida ainda.' : 'Nenhuma atividade encontrada para este filtro.'}</Text>
         </View>
       ) : (
-        atividades.map((item) => <AtividadeCard key={item.id} atividade={item} />)
+        atividadesFiltradas.map((item) => <AtividadeCard key={item.id} atividade={item} />)
       )}
     </ScrollView>
   );

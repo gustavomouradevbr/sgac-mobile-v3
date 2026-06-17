@@ -1,16 +1,18 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiFetch } from '../../src/services/api';
-import type { AlunoProgressoDTO } from '../../src/services/types';
+import type { AlunoProgressoDTO, SubmissaoResponse } from '../../src/services/types';
 
 export default function DashboardHome() {
   const [userName, setUserName] = useState('');
   const [dashboardData, setDashboardData] = useState<AlunoProgressoDTO | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [recentes, setRecentes] = useState<SubmissaoResponse[]>([]);
+  const router = useRouter();
 
   useEffect(() => {
     let isMounted = true;
@@ -36,6 +38,8 @@ export default function DashboardHome() {
         if (isMounted) {
           setDashboardData(data);
           setErrorMsg(null);
+          const submissoes = await apiFetch<SubmissaoResponse[]>(`/api/submissoes/aluno/${storedUserId}`);
+          if (isMounted) setRecentes(submissoes.slice(0, 3));
         }
       } catch (error: unknown) {
         if (isMounted) {
@@ -137,6 +141,32 @@ export default function DashboardHome() {
           ))}
         </View>
       )}
+       {recentes.length > 0 && (
+        <View style={styles.sectionCard}>
+          <View style={styles.recentesHeader}>
+            <Text style={styles.sectionTitle}>Atividades Recentes</Text>
+            <Pressable onPress={() => router.push('/dashboard/minhas-atividades')}>
+              <Text style={styles.verTodasText}>Ver todas</Text>
+            </Pressable>
+          </View>
+
+          {recentes.map(a => {
+            const s = STATUS_INFO[a.status];
+            return (
+              <View key={a.id} style={styles.recenteItem}>
+                <View style={styles.recenteLeft}>
+                  <Text style={styles.recenteTitulo} numberOfLines={1}>{a.titulo}</Text>
+                  <Text style={styles.recenteArea}>{AREA_LABELS[a.area] ?? a.area} · {a.cargaHoraria}h</Text>
+                </View>
+                <View style={[styles.recentePill, { backgroundColor: s.bg }]}>
+                  <MaterialIcons name={s.icon} size={13} color={s.color} />
+                  <Text style={[styles.recentePillText, { color: s.color }]}>{s.label}</Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -155,6 +185,12 @@ type MetricCardProps = {
   icon: keyof typeof MaterialIcons.glyphMap;
   iconColor: string;
   accentColor: string;
+};
+
+ const STATUS_INFO = {
+  APROVADA:  { label: 'Aprovada',  icon: 'check-circle' as const, color: '#1E8E4D', bg: '#DDF6E8' },
+  REPROVADA: { label: 'Reprovada', icon: 'cancel'       as const, color: '#B42318', bg: '#FDE4E1' },
+  PENDENTE:  { label: 'Pendente',  icon: 'schedule'     as const, color: '#B87800', bg: '#FFF1D8' },
 };
 
 function MetricCard({ title, value, icon, iconColor, accentColor }: MetricCardProps) {
@@ -212,4 +248,20 @@ const styles = StyleSheet.create({
   areaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   areaLabel: { color: '#334155', fontSize: 13, fontWeight: '600' },
   areaHoras: { color: '#64748B', fontSize: 12 },
+  recentesHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  verTodasText: { fontSize: 12, fontWeight: '700', color: '#004A8D' },
+  recenteItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 10,
+  },
+  recenteLeft: { flex: 1 },
+  recenteTitulo: { fontSize: 13, fontWeight: '700', color: '#153150' },
+  recenteArea:   { fontSize: 11, color: '#60748A', marginTop: 2 },
+  recentePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+  },
+  recentePillText: { fontSize: 11, fontWeight: '800' },
 });
